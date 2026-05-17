@@ -38,7 +38,7 @@ jobs:
       - run: npm test
 
   audit:
-    name: Dependency Audit (informational)
+    name: Dependency Audit (production deps)
     runs-on: ubuntu-latest
     continue-on-error: true
     steps:
@@ -48,4 +48,7 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
-      - run: npm audit --audit-level=high
+      # Only flag vulns that ship in the built extension. Build/test-time
+      # vulns (vite/esbuild/rollup/happy-dom dev-server issues) don't affect
+      # end users — `npm run audit` already passes `--omit=dev`.
+      - run: npm run audit
