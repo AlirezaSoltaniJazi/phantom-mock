@@ -2,11 +2,34 @@ import { STORAGE_KEYS } from '@/shared/constants';
 import { newId } from '@/utils/id';
 import type { CapturedEntry, CapturedHeader } from './capture/types';
 
-chrome.devtools.panels.create(
-  'Phantom Mock',
-  'public/icons/icon-32.png',
-  'src/devtools/panel.html',
-  () => undefined
+// When the extension is reloaded while DevTools is still open, this old
+// devtools.ts instance's chrome.* APIs become invalid. Any subsequent call
+// throws synchronously with "Extension context invalidated". Detect it once
+// and turn every further chrome.* call into a no-op so we don't spam the
+// errors panel.
+let contextValid = true;
+
+function safe(fn: () => void): void {
+  if (!contextValid) return;
+  try {
+    fn();
+  } catch (err) {
+    const msg = (err as Error | undefined)?.message ?? '';
+    if (msg.includes('Extension context invalidated')) {
+      contextValid = false;
+      return;
+    }
+    console.warn('[phantom-mock] devtools error', err);
+  }
+}
+
+safe(() =>
+  chrome.devtools.panels.create(
+    'Phantom Mock',
+    'public/icons/icon-32.png',
+    'src/devtools/panel.html',
+    () => undefined
+  )
 );
 
 // Capture every request the moment DevTools opens (not when the user finally
@@ -22,36 +45,48 @@ let buffer: CapturedEntry[] = [];
 let recording = true;
 let pendingWrite: ReturnType<typeof setTimeout> | null = null;
 
-void chrome.storage.session
-  .get([STORAGE_KEYS.CAPTURE_BUFFER, STORAGE_KEYS.CAPTURE_RECORDING])
-  .then((r) => {
-    const buf = r[STORAGE_KEYS.CAPTURE_BUFFER];
-    if (Array.isArray(buf)) buffer = buf as CapturedEntry[];
-    const rec = r[STORAGE_KEYS.CAPTURE_RECORDING];
-    if (typeof rec === 'boolean') recording = rec;
-  })
-  .catch(() => undefined);
+safe(() => {
+  void chrome.storage.session
+    .get([STORAGE_KEYS.CAPTURE_BUFFER, STORAGE_KEYS.CAPTURE_RECORDING])
+    .then((r) => {
+      const buf = r[STORAGE_KEYS.CAPTURE_BUFFER];
+      if (Array.isArray(buf)) buffer = buf as CapturedEntry[];
+      const rec = r[STORAGE_KEYS.CAPTURE_RECORDING];
+      if (typeof rec === 'boolean') recording = rec;
+    })
+    .catch(() => undefined);
+});
 
-chrome.storage.onChanged.addListener((changes, area) => {
-  if (area !== 'session') return;
-  const recCh = changes[STORAGE_KEYS.CAPTURE_RECORDING];
-  if (recCh && typeof recCh.newValue === 'boolean') {
-    recording = recCh.newValue;
-  }
-  const bufCh = changes[STORAGE_KEYS.CAPTURE_BUFFER];
-  if (bufCh && Array.isArray(bufCh.newValue)) {
-    // Panel (or another devtools instance) replaced the buffer — usually a
-    // Clear or a load-from-snapshot. Re-sync our in-memory view.
-    buffer = bufCh.newValue as CapturedEntry[];
-  }
+safe(() => {
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area !== 'session') return;
+    const recCh = changes[STORAGE_KEYS.CAPTURE_RECORDING];
+    if (recCh && typeof recCh.newValue === 'boolean') {
+      recording = recCh.newValue;
+    }
+    const bufCh = changes[STORAGE_KEYS.CAPTURE_BUFFER];
+    if (bufCh && Array.isArray(bufCh.newValue)) {
+      // Panel (or another devtools instance) replaced the buffer — usually a
+      // Clear or a load-from-snapshot. Re-sync our in-memory view.
+      buffer = bufCh.newValue as CapturedEntry[];
+    }
+  });
 });
 
 function scheduleWrite(): void {
+  if (!contextValid) return;
   if (pendingWrite !== null) return;
   pendingWrite = setTimeout(() => {
     pendingWrite = null;
-    void chrome.storage.session.set({ [STORAGE_KEYS.CAPTURE_BUFFER]: buffer }).catch((err) => {
-      console.warn('[phantom-mock] capture buffer write failed', err);
+    safe(() => {
+      void chrome.storage.session.set({ [STORAGE_KEYS.CAPTURE_BUFFER]: buffer }).catch((err) => {
+        const msg = (err as Error | undefined)?.message ?? '';
+        if (msg.includes('Extension context invalidated')) {
+          contextValid = false;
+          return;
+        }
+        console.warn('[phantom-mock] capture buffer write failed', err);
+      });
     });
   }, WRITE_DEBOUNCE_MS);
 }
@@ -78,8 +113,14 @@ function appendEntry(entry: CapturedEntry): void {
   scheduleWrite();
 }
 
-chrome.devtools.network.onRequestFinished.addListener((req) => {
-  if (!recording) return;
+safe(() =>
+  chrome.devtools.network.onRequestFinished.addListener((req) => {
+    if (!recording || !contextValid) return;
+    handleRequest(req);
+  })
+);
+
+function handleRequest(req: chrome.devtools.network.Request): void {
   const url = req.request.url;
   const requestHeaders = toHeaders(req.request.headers);
   const responseHeaders = toHeaders(req.response.headers);
@@ -120,4 +161,4 @@ chrome.devtools.network.onRequestFinished.addListener((req) => {
   } catch {
     appendEntry({ ...base, responseBody: null, responseEncoding: 'utf8' });
   }
-});
+}
