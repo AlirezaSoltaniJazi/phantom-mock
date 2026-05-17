@@ -33,7 +33,7 @@ jobs:
           # not trigger other workflows, so we won't recurse into this one.
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: 20
           cache: npm
