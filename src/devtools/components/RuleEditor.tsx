@@ -20,6 +20,7 @@ interface Props {
   onSave: (rule: Rule) => void;
   onCancel: () => void;
   onDelete?: (() => void) | undefined;
+  onCreateGroup: (name: string) => Promise<Group>;
 }
 
 const URL_MATCH_TYPES: UrlMatchType[] = ['exact', 'contains', 'regex'];
@@ -51,7 +52,14 @@ function defaultRule(groupId: string): Rule {
   };
 }
 
-export function RuleEditor({ initial, groups, onSave, onCancel, onDelete }: Props): JSX.Element {
+export function RuleEditor({
+  initial,
+  groups,
+  onSave,
+  onCancel,
+  onDelete,
+  onCreateGroup,
+}: Props): JSX.Element {
   const seed = initial ?? defaultRule(groups[0]?.id ?? 'default');
   const [draft, setDraft] = useState<Rule>(seed);
   const [testUrl, setTestUrl] = useState('');
@@ -125,16 +133,36 @@ export function RuleEditor({ initial, groups, onSave, onCancel, onDelete }: Prop
       <div className="pm-row">
         <div className="pm-field" style={{ flex: 1 }}>
           <label>Group</label>
-          <select
-            value={draft.groupId}
-            onChange={(e) => setDraft({ ...draft, groupId: e.target.value })}
-          >
-            {groups.map((g) => (
-              <option key={g.id} value={g.id}>
-                {g.name}
-              </option>
-            ))}
-          </select>
+          <div className="pm-row" style={{ gap: 4 }}>
+            <select
+              style={{ flex: 1 }}
+              value={draft.groupId}
+              onChange={(e) => setDraft({ ...draft, groupId: e.target.value })}
+            >
+              {groups.map((g) => (
+                <option key={g.id} value={g.id}>
+                  {g.name}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              className="pm-btn secondary"
+              title="Create a new group and select it"
+              onClick={async () => {
+                const name = window.prompt('New group name');
+                if (!name?.trim()) return;
+                try {
+                  const grp = await onCreateGroup(name);
+                  setDraft({ ...draft, groupId: grp.id });
+                } catch (err) {
+                  window.alert(`Could not create group: ${(err as Error).message}`);
+                }
+              }}
+            >
+              + New
+            </button>
+          </div>
         </div>
         <div className="pm-field" style={{ flex: 1 }}>
           <label>Type</label>

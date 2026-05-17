@@ -48,6 +48,7 @@ interface HarEntryLike {
     content?: { text?: string; encoding?: string; mimeType?: string };
   };
   startedDateTime?: string;
+  time?: number;
 }
 
 function buildEntryFromHar(e: HarEntryLike): CapturedEntry {
@@ -76,6 +77,7 @@ function buildEntryFromHar(e: HarEntryLike): CapturedEntry {
     path,
     status: e.response?.status ?? 0,
     statusText: e.response?.statusText ?? '',
+    durationMs: typeof e.time === 'number' && e.time >= 0 ? e.time : null,
     requestHeaders,
     requestBody,
     requestContentType,

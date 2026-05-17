@@ -18,6 +18,7 @@ interface Props {
   groups: Group[];
   onCancel: () => void;
   onCreate: (rule: Rule) => void;
+  onCreateGroup: (name: string) => Promise<Group>;
 }
 
 interface FieldSelection {
@@ -40,7 +41,13 @@ function defaultSelection(): FieldSelection {
   };
 }
 
-export function PromoteToRule({ entry, groups, onCancel, onCreate }: Props): JSX.Element {
+export function PromoteToRule({
+  entry,
+  groups,
+  onCancel,
+  onCreate,
+  onCreateGroup,
+}: Props): JSX.Element {
   const [name, setName] = useState(() => `${entry.method} ${entry.path}`.slice(0, 80));
   const [groupId, setGroupId] = useState(groups[0]?.id ?? DEFAULT_GROUP_ID);
   const [matchType, setMatchType] = useState<UrlMatchType>('contains');
@@ -135,13 +142,36 @@ export function PromoteToRule({ entry, groups, onCancel, onCreate }: Props): JSX
       <div className="pm-row">
         <div className="pm-field" style={{ flex: 1 }}>
           <label>Group</label>
-          <select value={groupId} onChange={(e) => setGroupId(e.target.value)}>
-            {groups.map((g) => (
-              <option key={g.id} value={g.id}>
-                {g.name}
-              </option>
-            ))}
-          </select>
+          <div className="pm-row" style={{ gap: 4 }}>
+            <select
+              style={{ flex: 1 }}
+              value={groupId}
+              onChange={(e) => setGroupId(e.target.value)}
+            >
+              {groups.map((g) => (
+                <option key={g.id} value={g.id}>
+                  {g.name}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              className="pm-btn secondary"
+              title="Create a new group and select it"
+              onClick={async () => {
+                const name = window.prompt('New group name');
+                if (!name?.trim()) return;
+                try {
+                  const grp = await onCreateGroup(name);
+                  setGroupId(grp.id);
+                } catch (err) {
+                  window.alert(`Could not create group: ${(err as Error).message}`);
+                }
+              }}
+            >
+              + New
+            </button>
+          </div>
         </div>
         <div className="pm-field" style={{ flex: 1 }}>
           <label>Rule kind</label>

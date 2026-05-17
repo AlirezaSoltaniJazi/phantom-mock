@@ -1,12 +1,34 @@
 import { STORAGE_KEYS } from './constants';
 import {
+  CAPTURE_COLUMN_ORDER,
+  DEFAULT_CAPTURE_COLUMNS,
   DEFAULT_UI_PREFERENCES,
   clampFontSize,
+  type CaptureColumn,
   type UIPreferences,
   type FontSizeMode,
 } from './types';
 
 const FONT_SIZE_MODES: ReadonlySet<FontSizeMode> = new Set(['small', 'normal', 'big', 'custom']);
+
+function sanitizeColumns(value: unknown): Record<CaptureColumn, boolean> {
+  if (typeof value !== 'object' || value === null) {
+    return { ...DEFAULT_CAPTURE_COLUMNS };
+  }
+  const v = value as Partial<Record<CaptureColumn, unknown>>;
+  const out = { ...DEFAULT_CAPTURE_COLUMNS };
+  let anyTrue = false;
+  for (const key of CAPTURE_COLUMN_ORDER) {
+    if (typeof v[key] === 'boolean') {
+      out[key] = v[key];
+    }
+    if (out[key]) anyTrue = true;
+  }
+  // Always force at least the path column on so the row isn't empty.
+  if (!anyTrue) out.path = true;
+  out.path = out.path || DEFAULT_CAPTURE_COLUMNS.path;
+  return out;
+}
 
 function sanitize(value: unknown): UIPreferences {
   if (typeof value !== 'object' || value === null) return { ...DEFAULT_UI_PREFERENCES };
@@ -20,7 +42,8 @@ function sanitize(value: unknown): UIPreferences {
       : DEFAULT_UI_PREFERENCES.fontSizeCustomPx;
   const showToast =
     typeof v.showToast === 'boolean' ? v.showToast : DEFAULT_UI_PREFERENCES.showToast;
-  return { fontSizeMode, fontSizeCustomPx, showToast };
+  const captureColumns = sanitizeColumns(v.captureColumns);
+  return { fontSizeMode, fontSizeCustomPx, showToast, captureColumns };
 }
 
 export async function getPrefs(): Promise<UIPreferences> {

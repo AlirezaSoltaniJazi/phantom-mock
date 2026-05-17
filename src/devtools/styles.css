@@ -546,7 +546,7 @@ button.pm-json-clickable {
 
 .pm-cap-row {
   display: grid;
-  grid-template-columns: 72px 56px 48px 1fr 60px;
+  /* grid-template-columns is set inline based on visible columns */
   gap: 6px;
   align-items: center;
   padding: 4px 8px 4px 40px;
@@ -604,6 +604,34 @@ button.pm-json-clickable {
   color: var(--fg-muted);
   font-size: 11px;
   text-align: right;
+}
+
+.pm-columns-menu {
+  position: relative;
+  display: inline-block;
+}
+
+.pm-columns-popover {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 4px);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 6px 10px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 140px;
+}
+
+.pm-columns-popover .pm-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
 }
 
 .pm-capture-detail {

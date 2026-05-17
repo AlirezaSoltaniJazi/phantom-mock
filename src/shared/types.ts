@@ -92,16 +92,47 @@ export type ImportStrategy = 'replace' | 'merge-by-id' | 'append-as-new';
 
 export type FontSizeMode = 'small' | 'normal' | 'big' | 'custom';
 
+export type CaptureColumn = 'time' | 'method' | 'status' | 'path' | 'size' | 'duration';
+
+export const CAPTURE_COLUMN_ORDER: readonly CaptureColumn[] = [
+  'time',
+  'method',
+  'status',
+  'path',
+  'size',
+  'duration',
+];
+
+export const CAPTURE_COLUMN_LABELS: Record<CaptureColumn, string> = {
+  time: 'Time',
+  method: 'Method',
+  status: 'Status',
+  path: 'Path',
+  size: 'Size',
+  duration: 'Duration',
+};
+
 export interface UIPreferences {
   fontSizeMode: FontSizeMode;
   fontSizeCustomPx: number;
   showToast: boolean;
+  captureColumns: Record<CaptureColumn, boolean>;
 }
+
+export const DEFAULT_CAPTURE_COLUMNS: Record<CaptureColumn, boolean> = {
+  time: true,
+  method: true,
+  status: true,
+  path: true,
+  size: false,
+  duration: false,
+};
 
 export const DEFAULT_UI_PREFERENCES: UIPreferences = {
   fontSizeMode: 'normal',
   fontSizeCustomPx: 14,
   showToast: true,
+  captureColumns: { ...DEFAULT_CAPTURE_COLUMNS },
 };
 
 export const FONT_SIZE_PX: Record<Exclude<FontSizeMode, 'custom'>, number> = {

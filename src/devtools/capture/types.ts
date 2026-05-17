@@ -12,6 +12,7 @@ export interface CapturedEntry {
   path: string;
   status: number;
   statusText: string;
+  durationMs: number | null;
   requestHeaders: CapturedHeader[];
   requestBody: string | null;
   requestContentType: string | null;
@@ -19,6 +20,12 @@ export interface CapturedEntry {
   responseBody: string | null;
   responseContentType: string;
   responseEncoding: 'utf8' | 'base64';
+}
+
+export function formatDuration(ms: number | null): string {
+  if (ms === null || !Number.isFinite(ms) || ms < 0) return '—';
+  if (ms < 1000) return `${Math.round(ms)}ms`;
+  return `${(ms / 1000).toFixed(2)}s`;
 }
 
 export function matchesHostFilter(url: string, filter: string): boolean {

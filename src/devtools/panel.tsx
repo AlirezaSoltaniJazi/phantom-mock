@@ -7,9 +7,10 @@ import { HitLog } from './components/HitLog';
 import { Settings } from './components/Settings';
 import { Capture } from './capture/Capture';
 import { useCapture } from './capture/use-capture';
-import type { Rule } from '@/shared/types';
+import type { Group, Rule } from '@/shared/types';
 import { STORAGE_KEYS } from '@/shared/constants';
 import { usePrefs, applyFontSizeVar } from '@/shared/use-prefs';
+import { newId } from '@/utils/id';
 import './styles.css';
 
 type Tab = 'rules' | 'editor' | 'hits' | 'capture' | 'settings';
@@ -51,6 +52,19 @@ function App(): JSX.Element {
     await mutate({ kind: 'upsertRule', rule });
     setEditing(null);
     setTab('rules');
+  }
+
+  async function createGroup(name: string): Promise<Group> {
+    const trimmed = name.trim();
+    if (!trimmed) throw new Error('Group name is required');
+    const group: Group = {
+      id: newId('grp'),
+      name: trimmed,
+      enabled: true,
+      order: state?.groups.length ?? 0,
+    };
+    await mutate({ kind: 'upsertGroup', group });
+    return group;
   }
 
   return (
@@ -108,8 +122,10 @@ function App(): JSX.Element {
         {tab === 'rules' ? <RulesTable state={state} onEdit={startEdit} mutate={mutate} /> : null}
         {tab === 'editor' ? (
           <RuleEditor
+            key={editing?.id ?? 'new'}
             initial={editing}
             groups={state.groups}
+            onCreateGroup={createGroup}
             onSave={(rule) => void save(rule)}
             onCancel={() => {
               setEditing(null);
@@ -131,6 +147,7 @@ function App(): JSX.Element {
           <Capture
             groups={state.groups}
             mutate={mutate}
+            onCreateGroup={createGroup}
             hostFilter={captureFilter}
             setHostFilter={setCaptureFilter}
             recording={recording}
@@ -139,6 +156,8 @@ function App(): JSX.Element {
             clear={capture.clear}
             importFromNetworkLog={capture.importFromNetworkLog}
             reloadInspectedPage={capture.reloadInspectedPage}
+            prefs={prefs}
+            setPrefs={setPrefs}
           />
         ) : null}
         {tab === 'settings' ? (

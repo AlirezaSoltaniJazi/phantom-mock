@@ -102,6 +102,7 @@ chrome.devtools.network.onRequestFinished.addListener((req) => {
     path,
     status: req.response.status,
     statusText: req.response.statusText ?? '',
+    durationMs: typeof req.time === 'number' && req.time >= 0 ? req.time : null,
     requestHeaders,
     requestBody: truncate(requestBody),
     requestContentType: findHeader(requestHeaders, 'content-type'),
