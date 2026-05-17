@@ -422,3 +422,227 @@ button.pm-json-clickable {
 .pm-selection-group:last-child {
   margin-bottom: 0;
 }
+
+.pm-capture {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  gap: 8px;
+}
+
+.pm-capture-toolbar {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.pm-capture-filter {
+  flex: 1;
+  font: inherit;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg);
+  color: var(--fg);
+}
+
+.pm-capture-body {
+  display: grid;
+  grid-template-columns: minmax(340px, 1fr) minmax(360px, 1.2fr);
+  gap: 12px;
+  flex: 1;
+  min-height: 0;
+}
+
+.pm-capture-list {
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  overflow: auto;
+  background: var(--bg-alt);
+}
+
+.pm-capture-table th,
+.pm-capture-table td {
+  white-space: nowrap;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pm-capture-row {
+  cursor: pointer;
+}
+.pm-capture-row:hover {
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+.pm-capture-row.is-selected {
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+}
+
+.pm-capture-tree {
+  padding: 4px 0;
+}
+
+.pm-cap-host {
+  margin: 0;
+}
+
+.pm-cap-host > summary {
+  list-style: revert;
+  cursor: pointer;
+  padding: 6px 10px;
+  background: var(--bg-alt);
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
+.pm-cap-host-name {
+  flex: 1;
+  font-family: ui-monospace, monospace;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pm-cap-sub {
+  margin: 0;
+}
+
+.pm-cap-sub > summary {
+  list-style: revert;
+  cursor: pointer;
+  padding: 4px 10px 4px 24px;
+  font-family: ui-monospace, monospace;
+  font-size: calc(var(--pm-font-size) - 1px);
+  color: var(--fg-muted);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border-top: 1px dashed var(--border);
+}
+
+.pm-cap-sub-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pm-cap-count {
+  color: var(--fg-muted);
+  font-size: 11px;
+  font-weight: 400;
+}
+
+.pm-cap-rows {
+  display: flex;
+  flex-direction: column;
+}
+
+.pm-cap-row {
+  display: grid;
+  grid-template-columns: 72px 56px 48px 1fr 60px;
+  gap: 6px;
+  align-items: center;
+  padding: 4px 8px 4px 40px;
+  font: inherit;
+  text-align: left;
+  background: transparent;
+  color: var(--fg);
+  border: none;
+  border-top: 1px dashed var(--border);
+  cursor: pointer;
+}
+
+.pm-cap-row:hover {
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
+.pm-cap-row.is-selected {
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+.pm-cap-time {
+  color: var(--fg-muted);
+  font-family: ui-monospace, monospace;
+  font-size: 11px;
+}
+
+.pm-cap-method {
+  font-family: ui-monospace, monospace;
+  font-size: 11px;
+  color: var(--fg-muted);
+}
+
+.pm-cap-status {
+  font-family: ui-monospace, monospace;
+  font-size: 11px;
+  color: var(--ok);
+}
+.pm-cap-status.redir {
+  color: var(--warning);
+}
+.pm-cap-status.err {
+  color: var(--danger);
+}
+
+.pm-cap-path {
+  font-family: ui-monospace, monospace;
+  font-size: calc(var(--pm-font-size) - 1px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.pm-cap-size {
+  color: var(--fg-muted);
+  font-size: 11px;
+  text-align: right;
+}
+
+.pm-capture-detail {
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 12px;
+  overflow: auto;
+  background: var(--bg);
+}
+
+.pm-pre {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: calc(var(--pm-font-size) - 1px);
+  background: var(--bg-alt);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 8px;
+  max-height: 280px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.pm-header-list {
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg-alt);
+  max-height: 200px;
+  overflow: auto;
+}
+
+.pm-header-row-pick {
+  display: grid;
+  grid-template-columns: auto 160px 1fr;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px;
+  border-bottom: 1px dashed var(--border);
+}
+.pm-header-row-pick:last-child {
+  border-bottom: none;
+}

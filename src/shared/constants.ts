@@ -1,6 +1,9 @@
 export const STORAGE_KEYS = {
   APP_STATE: 'phantomMock.appState.v1',
   UI_PREFS: 'phantomMock.uiPrefs.v1',
+  // session-area keys — cleared when the browser session ends
+  CAPTURE_BUFFER: 'phantomMock.captureBuffer.v1',
+  CAPTURE_RECORDING: 'phantomMock.captureRecording.v1',
 } as const;
 
 export const MESSAGE_TYPES = {

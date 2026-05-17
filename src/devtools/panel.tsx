@@ -5,21 +5,39 @@ import { RulesTable } from './components/RulesTable';
 import { RuleEditor } from './components/RuleEditor';
 import { HitLog } from './components/HitLog';
 import { Settings } from './components/Settings';
+import { Capture } from './capture/Capture';
+import { useCapture } from './capture/use-capture';
 import type { Rule } from '@/shared/types';
+import { STORAGE_KEYS } from '@/shared/constants';
 import { usePrefs, applyFontSizeVar } from '@/shared/use-prefs';
 import './styles.css';
 
-type Tab = 'rules' | 'editor' | 'hits' | 'settings';
+type Tab = 'rules' | 'editor' | 'hits' | 'capture' | 'settings';
 
 function App(): JSX.Element {
   const { state, error, mutate } = useAppState();
   const { prefs, setPrefs, fontSizePx } = usePrefs();
   const [tab, setTab] = useState<Tab>('rules');
   const [editing, setEditing] = useState<Rule | null>(null);
+  const [captureFilter, setCaptureFilter] = useState('');
+  const [recording, setRecording] = useState(true);
+  const capture = useCapture({ hostFilter: captureFilter, recording });
 
   useEffect(() => {
     applyFontSizeVar(document.documentElement, fontSizePx);
   }, [fontSizePx]);
+
+  // Pull the persisted recording flag once on mount so the toggle reflects the
+  // state devtools.ts is actually using.
+  useEffect(() => {
+    void chrome.storage.session
+      .get(STORAGE_KEYS.CAPTURE_RECORDING)
+      .then((r) => {
+        const v = r[STORAGE_KEYS.CAPTURE_RECORDING];
+        if (typeof v === 'boolean') setRecording(v);
+      })
+      .catch(() => undefined);
+  }, []);
 
   if (error) return <div style={{ padding: 16, color: 'var(--danger)' }}>Error: {error}</div>;
   if (!state) return <div style={{ padding: 16 }}>Loading…</div>;
@@ -64,6 +82,13 @@ function App(): JSX.Element {
         </button>
         <button
           type="button"
+          className={`pm-tab ${tab === 'capture' ? 'is-active' : ''}`}
+          onClick={() => setTab('capture')}
+        >
+          Capture
+        </button>
+        <button
+          type="button"
           className={`pm-tab ${tab === 'settings' ? 'is-active' : ''}`}
           onClick={() => setTab('settings')}
         >
@@ -102,6 +127,20 @@ function App(): JSX.Element {
           />
         ) : null}
         {tab === 'hits' ? <HitLog /> : null}
+        {tab === 'capture' ? (
+          <Capture
+            groups={state.groups}
+            mutate={mutate}
+            hostFilter={captureFilter}
+            setHostFilter={setCaptureFilter}
+            recording={recording}
+            setRecording={setRecording}
+            entries={capture.entries}
+            clear={capture.clear}
+            importFromNetworkLog={capture.importFromNetworkLog}
+            reloadInspectedPage={capture.reloadInspectedPage}
+          />
+        ) : null}
         {tab === 'settings' ? (
           <Settings state={state} mutate={mutate} prefs={prefs} setPrefs={setPrefs} />
         ) : null}

@@ -4,7 +4,12 @@ import { MESSAGE_TYPES } from '@/shared/constants';
 import { isRuntimeMessage, sendMessage, type StateMutation } from '@/shared/messages';
 import type { AppState, Rule } from '@/shared/types';
 import { applyFontSizeVar, usePrefs } from '@/shared/use-prefs';
-import { bucketByBaseDomain, bucketBySubdomain, deriveUrlParts } from '@/shared/url-parts';
+import {
+  bucketByBaseDomain,
+  bucketBySubdomain,
+  deriveUrlParts,
+  ruleToUrl,
+} from '@/shared/url-parts';
 import './styles.css';
 
 function Popup(): JSX.Element {
@@ -94,7 +99,7 @@ function Popup(): JSX.Element {
         ) : (
           groups.map((g) => {
             const groupRules = rulesByGroup.get(g.id) ?? [];
-            const buckets = bucketByBaseDomain(groupRules);
+            const buckets = bucketByBaseDomain(groupRules, ruleToUrl);
             return (
               <div key={g.id}>
                 <div className="pop-group">
@@ -109,13 +114,13 @@ function Popup(): JSX.Element {
                   <small>{groupRules.length}</small>
                 </div>
                 {buckets.map((bucket, bi) => {
-                  const subBuckets = bucketBySubdomain(bucket.rules);
+                  const subBuckets = bucketBySubdomain(bucket.items, ruleToUrl);
                   return (
                     <div className="pop-host-bucket" key={`${g.id}-${bi}`}>
                       <div className="pop-host" title={bucket.baseDomain ?? 'No host'}>
                         <SchemeIcon scheme={bucket.scheme} />
                         <span className="pop-host-name">{bucket.baseDomain ?? '(no host)'}</span>
-                        <small>{bucket.rules.length}</small>
+                        <small>{bucket.items.length}</small>
                       </div>
                       {subBuckets.map((sub, si) => (
                         <div className="pop-subhost-bucket" key={`${g.id}-${bi}-${si}`}>
@@ -124,9 +129,9 @@ function Popup(): JSX.Element {
                             title={sub.subdomain ?? `(${bucket.baseDomain ?? 'no host'})`}
                           >
                             <span className="pop-subhost-name">{sub.subdomain ?? '(root)'}</span>
-                            <small>{sub.rules.length}</small>
+                            <small>{sub.items.length}</small>
                           </div>
-                          {sub.rules.map((rule) => {
+                          {sub.items.map((rule) => {
                             const parts = deriveUrlParts(rule);
                             return (
                               <div className="pop-rule" key={rule.id}>

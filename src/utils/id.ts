@@ -1,4 +1,4 @@
-export function newId(prefix: 'rule' | 'grp'): string {
+export function newId(prefix: string): string {
   const cryptoLike = globalThis.crypto;
   const suffix =
     cryptoLike && typeof cryptoLike.randomUUID === 'function'

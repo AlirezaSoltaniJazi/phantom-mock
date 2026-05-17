@@ -90,59 +90,77 @@ export function deriveUrlParts(rule: Rule): UrlParts {
   };
 }
 
-export interface DomainBucket {
+/** Convenience extractor for Rule items — falls back from rule.name to rule.match.urlPattern. */
+export function ruleToUrl(rule: Rule): UrlParts {
+  return deriveUrlParts(rule);
+}
+
+/** Convenience extractor for plain URL strings (e.g. CapturedEntry.url). */
+export function urlToParts(url: string): UrlParts {
+  const parsed = tryParse(url);
+  if (parsed) return parsed;
+  return { scheme: null, host: null, baseDomain: null, subdomain: null, path: url };
+}
+
+export interface DomainBucket<T> {
   baseDomain: string | null;
   scheme: UrlParts['scheme'];
-  rules: Rule[];
+  items: T[];
 }
 
 /**
- * Groups rules by the registrable domain of their URL (last 2 host labels,
- * with a small allow-list for two-part ccTLDs). Rules whose pattern is not a
- * URL fall under a `null` baseDomain bucket.
+ * Groups items by the registrable domain of their URL (last 2 host labels,
+ * with a small allow-list for two-part ccTLDs). Items whose URL is not parseable
+ * fall under a `null` baseDomain bucket.
  */
-export function bucketByBaseDomain(rules: Rule[]): DomainBucket[] {
+export function bucketByBaseDomain<T>(
+  items: T[],
+  extract: (item: T) => UrlParts
+): DomainBucket<T>[] {
   const order: string[] = [];
-  const map = new Map<string, DomainBucket>();
-  for (const rule of rules) {
-    const parts = deriveUrlParts(rule);
+  const map = new Map<string, DomainBucket<T>>();
+  for (const item of items) {
+    const parts = extract(item);
     const key = parts.baseDomain ?? '__noHost__';
     let bucket = map.get(key);
     if (!bucket) {
-      bucket = { baseDomain: parts.baseDomain, scheme: parts.scheme, rules: [] };
+      bucket = { baseDomain: parts.baseDomain, scheme: parts.scheme, items: [] };
       map.set(key, bucket);
       order.push(key);
     } else if (bucket.scheme === null && parts.scheme) {
       bucket.scheme = parts.scheme;
     }
-    bucket.rules.push(rule);
+    bucket.items.push(item);
   }
-  return order.map((k) => map.get(k)).filter((b): b is DomainBucket => Boolean(b));
+  return order.map((k) => map.get(k)).filter((b): b is DomainBucket<T> => Boolean(b));
 }
 
-export interface SubdomainBucket {
+export interface SubdomainBucket<T> {
   subdomain: string | null;
-  rules: Rule[];
+  items: T[];
 }
 
 /**
- * Within a single base-domain bucket, further group rules by their subdomain
+ * Within a single base-domain bucket, further group items by their subdomain
  * prefix (e.g. `kinexus.emea.validation` vs `kinexus.admin.emea.validation`).
- * Rules pointed directly at the registrable domain land under `subdomain: null`.
+ * Items pointed directly at the registrable domain land under `subdomain: null`.
  */
-export function bucketBySubdomain(rules: Rule[]): SubdomainBucket[] {
+export function bucketBySubdomain<T>(
+  items: T[],
+  extract: (item: T) => UrlParts
+): SubdomainBucket<T>[] {
   const order: string[] = [];
-  const map = new Map<string, SubdomainBucket>();
-  for (const rule of rules) {
-    const parts = deriveUrlParts(rule);
+  const map = new Map<string, SubdomainBucket<T>>();
+  for (const item of items) {
+    const parts = extract(item);
     const key = parts.subdomain ?? '__root__';
     let bucket = map.get(key);
     if (!bucket) {
-      bucket = { subdomain: parts.subdomain, rules: [] };
+      bucket = { subdomain: parts.subdomain, items: [] };
       map.set(key, bucket);
       order.push(key);
     }
-    bucket.rules.push(rule);
+    bucket.items.push(item);
   }
-  return order.map((k) => map.get(k)).filter((b): b is SubdomainBucket => Boolean(b));
+  return order.map((k) => map.get(k)).filter((b): b is SubdomainBucket<T> => Boolean(b));
 }
