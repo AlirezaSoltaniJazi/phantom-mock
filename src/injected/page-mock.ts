@@ -9,6 +9,13 @@ type RulesPayload = {
 };
 
 let cache: RulesPayload = { masterEnabled: false, groups: [], rules: [] };
+let verboseLog = false;
+
+function logVerbose(...args: unknown[]): void {
+  if (verboseLog) {
+    console.log('[phantom-mock]', ...args);
+  }
+}
 
 export function setRulesCacheForTest(next: RulesPayload): void {
   cache = next;
@@ -103,6 +110,7 @@ function patchFetch(): void {
     if (init?.method) method = init.method;
 
     const match = findMatch(url, method);
+    logVerbose('fetch', method, url, 'match=', match ? match.name : 'no');
     if (!match || match.action.kind !== 'mock') {
       return original(input, init);
     }
@@ -168,6 +176,7 @@ function patchXhr(): void {
   ): void {
     const self = this as PatchedXhr;
     const match = findMatch(self._pm_url, self._pm_method);
+    logVerbose('xhr', self._pm_method, self._pm_url, 'match=', match ? match.name : 'no');
     if (!match || match.action.kind !== 'mock') {
       return OriginalSend.call(this, body ?? null);
     }
@@ -236,13 +245,91 @@ function statusText(code: number): string {
 }
 
 let installed = false;
+let originalFetchRef: typeof window.fetch | null = null;
+let patchedFetchRef: typeof window.fetch | null = null;
 
 export function install(): void {
   if (installed) return;
   installed = true;
+  originalFetchRef = window.fetch.bind(window);
   window.addEventListener('message', onWindowMessage);
   patchFetch();
   patchXhr();
+  patchedFetchRef = window.fetch;
+  exposeDebugApi();
+
+  console.log(
+    '%c[phantom-mock]%c installed on %s — run window.__phantomMock to inspect',
+    'color:#6040c4;font-weight:bold',
+    'color:inherit',
+    window.location.href
+  );
+}
+
+function exposeDebugApi(): void {
+  const api = {
+    get installed(): boolean {
+      return installed;
+    },
+    get fetchPatched(): boolean {
+      return window.fetch === patchedFetchRef && patchedFetchRef !== originalFetchRef;
+    },
+    get masterEnabled(): boolean {
+      return cache.masterEnabled;
+    },
+    get ruleCount(): number {
+      return cache.rules.length;
+    },
+    rules(): Array<{
+      id: string;
+      name: string;
+      method: string;
+      pattern: string;
+      enabled: boolean;
+    }> {
+      return cache.rules.map((r) => ({
+        id: r.id,
+        name: r.name,
+        method: r.match.method,
+        pattern: r.match.urlPattern,
+        enabled: r.enabled,
+      }));
+    },
+    get verbose(): boolean {
+      return verboseLog;
+    },
+    setVerbose(v: boolean): void {
+      verboseLog = Boolean(v);
+
+      console.log(`[phantom-mock] verbose=${verboseLog}`);
+    },
+    test(url: string, method = 'GET'): { matched: boolean; ruleId?: string; ruleName?: string } {
+      const fakeState = {
+        schemaVersion: 1 as const,
+        masterEnabled: cache.masterEnabled,
+        groups: cache.groups,
+        rules: cache.rules,
+      };
+      const view = buildActiveView(fakeState);
+      for (const rule of cache.rules) {
+        if (rule.action.kind !== 'mock') continue;
+        if (!isRuleActive(rule, view, cache.masterEnabled)) continue;
+        if (specMatches(rule.match, url, method)) {
+          return { matched: true, ruleId: rule.id, ruleName: rule.name };
+        }
+      }
+      return { matched: false };
+    },
+  };
+  try {
+    Object.defineProperty(window, '__phantomMock', {
+      value: api,
+      configurable: true,
+      writable: false,
+    });
+  } catch {
+    (window as unknown as { __phantomMock: unknown }).__phantomMock = api;
+  }
 }
 
 install();
