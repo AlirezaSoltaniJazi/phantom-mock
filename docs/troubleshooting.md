@@ -1,0 +1,99 @@
+# Troubleshooting
+
+## Known gotchas
+
+### Mock rules don't use declarativeNetRequest — only header rules do
+
+**Cause**: Chrome's DNR API cannot return synthetic response bodies. Mock rules (response mocking) are enforced entirely client-side by patching `fetch` and `XMLHttpRequest` in `src/injected/page-mock.ts`. Only `header`-type rules are compiled to DNR in `src/background/rules-dnr.ts`.
+
+**Implication**: If you add a new action type, decide whether it needs network-layer enforcement (DNR) or client-side interception (page-mock). Do not mix the two paths for a single rule.
+
+### Service worker `onMessage` handler must return `true` for async responses
+
+**Cause**: Chrome's `chrome.runtime.onMessage` listener only keeps the `sendResponse` port open if the listener synchronously returns `true`. The handler in `src/background/index.ts` returns `true` at the end — do not refactor this away.
+
+**Fix**: Always `return true` from the `onMessage` callback when using `sendResponse` asynchronously.
+
+### Content scripts run in two separate worlds
+
+**Cause**: `src/content/index.ts` runs in the extension's isolated world (has `chrome.*` API access). `src/injected/page-mock.ts` runs in the page's MAIN world (has `window.fetch` access but no `chrome.*`). They communicate only via `window.postMessage`.
+
+**Implication**: Never import `chrome.*` in `src/injected/page-mock.ts`. Never try to access page globals from `src/content/index.ts`. All cross-world data flows through `window.postMessage` with the `PAGE_MESSAGE_SOURCE` identifier.
+
+### First-match-wins rule ordering
+
+**Cause**: `findMatch()` in `src/injected/page-mock.ts` and `findFirstMockMatch()` in `src/shared/matcher.ts` iterate rules in array order and return the first match. There is no priority field.
+
+**Implication**: Rule order matters. More specific rules should appear before broader ones. The UI supports drag-and-drop reordering via `@dnd-kit`.
+
+### Regex match type compiles a new RegExp on every check
+
+**Cause**: `urlMatches()` in `src/shared/matcher.ts` calls `new RegExp(pattern)` inside a try-catch on each invocation. Invalid regex patterns are caught and return `false` silently.
+
+**Fix**: If performance becomes an issue with many regex rules, add a compilation cache. For now, the rule count cap (`MAX_RULES`) keeps this manageable.
+
+### Toast notifications use Shadow DOM isolation
+
+**Cause**: `src/content/toast.ts` injects a Shadow DOM container to prevent page CSS from affecting toast styling.
+
+**Implication**: Do not use `document.querySelector` to find toast elements from the page — they are inside a shadow root.
+
+### DNR rule IDs are hash-based, not sequential
+
+**Cause**: `hashStringToInt()` in `src/utils/id.ts` converts rule string IDs to integer IDs for DNR, offset by `DNR_RULE_ID_OFFSET`. Hash collisions are theoretically possible but unlikely at normal rule counts.
+
+**Implication**: Do not assume DNR rule IDs are sequential or stable across rule ID renames.
+
+### Capture buffer is session storage, not local storage
+
+**Cause**: `devtools/devtools.ts` writes captured entries to `chrome.storage.session` (not `chrome.storage.local`). Session storage is cleared when the browser closes.
+
+**Implication**: Captured entries do not persist across browser restarts. This is intentional — capture is for temporary debugging, not permanent storage.
+
+### DevTools context invalidation after extension reload
+
+**Cause**: When the extension is reloaded during development, existing DevTools panels lose their connection to the service worker. `devtools/devtools.ts` uses a `contextValid` flag to guard against calls after context invalidation.
+
+**Fix**: Close and reopen DevTools after reloading the extension.
+
+## Files that must change together
+
+### Rule or group schema changes
+
+- `src/shared/types.ts` — update `Rule`, `Group`, `AppState`, or action interfaces
+- `src/background/index.ts` — update `applyMutation()` if mutation shapes change
+- `src/shared/import-export.ts` — update `validateBundle()` to accept/reject new fields
+- `src/devtools/components/RuleEditor.tsx` — update form to expose new fields
+- `src/background/storage.ts` — update `defaultState()` if `AppState` shape changes; consider schema migration
+
+### New message types
+
+- `src/shared/constants.ts` — add to `MESSAGE_TYPES`
+- `src/shared/messages.ts` — add to `RuntimeMessage` union
+- `src/background/index.ts` — add handler case
+
+### New storage keys
+
+- `src/shared/constants.ts` — add to `STORAGE_KEYS`
+- Whichever module reads/writes the key (e.g., `background/storage.ts`, `shared/prefs.ts`)
+
+### URL matching logic
+
+- `src/shared/matcher.ts` — matching algorithm
+- `src/injected/page-mock.ts` — client-side matching in `findMatch()`
+- `src/background/rules-dnr.ts` — DNR condition translation
+
+## Generated files (never edit manually)
+
+- `dist/` — entire directory is build output from Vite + CRXJS. Regenerated on `npm run build` or `npm run dev`
+- `dist/manifest.json` — generated by CRXJS plugin from the root `manifest.json`; includes auto-injected HMR scripts in dev mode
+- `coverage/` — generated by `npm run test:coverage`
+- `release/*.zip` — generated by `npm run package`
+- `node_modules/` — managed by npm
+
+## See also
+
+- [Architecture](architecture.md)
+- [Modules](modules.md)
+- [Extending](extending.md)
+- [SKILL.md](../.data/skills/chromeExtensionDeveloper/SKILL.md) — detailed patterns, anti-patterns, and security checklist
