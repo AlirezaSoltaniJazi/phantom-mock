@@ -1,0 +1,44 @@
+# IDE
+/.idea/
+.vscode/launch.json
+.vscode/tasks.json
+
+# Build output
+dist/
+release/
+
+# Coverage
+coverage/
+*.lcov
+.nyc_output
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Dependencies
+node_modules/
+
+# Caches
+.eslintcache
+*.tsbuildinfo
+.vite/
+vite.config.ts.timestamp-*
+
+# Local env files
+.env
+.env.*
+!.env.example
+
+# Macros / OS
+.DS_Store
+
+# Husky hook auto-installed by `husky` command (we keep pre-commit committed)
+# but ignore the underlying installation dir
+/.husky/_
+
+# Local Claude state
+/.claude/settings.json
