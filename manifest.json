@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Phantom Mock",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Mock REST API responses and override request/response headers directly from your browser.",
   "permissions": ["declarativeNetRequest", "declarativeNetRequestFeedback", "storage", "scripting"],
   "host_permissions": ["<all_urls>"],

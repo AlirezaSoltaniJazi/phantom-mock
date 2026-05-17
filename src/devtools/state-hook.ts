@@ -48,6 +48,10 @@ export function useAppState(): UseAppStateResult {
   }, []);
 
   useEffect(() => {
+    // Initial pull of state from the service worker on mount, paired with the
+    // subscription set up below. The setState happens inside `refresh`, which
+    // is what react-hooks/set-state-in-effect flags — accepted here.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void refresh();
     const listener = (message: unknown): void => {
       if (!isRuntimeMessage(message)) return;

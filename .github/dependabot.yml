@@ -9,6 +9,12 @@ updates:
       timezone: 'UTC'
     open-pull-requests-limit: 5
     groups:
+      eslint:
+        patterns:
+          - 'eslint'
+          - '@eslint/*'
+          - 'eslint-*'
+          - '@typescript-eslint/*'
       minor-and-patch:
         update-types:
           - minor
@@ -28,6 +34,10 @@ updates:
       time: '06:00'
       timezone: 'UTC'
     open-pull-requests-limit: 5
+    groups:
+      github-actions:
+        patterns:
+          - '*'
     labels:
       - dependencies
       - github-actions
