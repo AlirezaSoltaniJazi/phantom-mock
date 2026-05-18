@@ -30,7 +30,6 @@ For each permission, paste this into the dashboard "Permission justifications":
 - `declarativeNetRequest` — required to implement user-defined header overrides at the network layer.
 - `declarativeNetRequestFeedback` — required for debugging which DNR rules matched during development; needed for the "hit log" surface in the DevTools panel.
 - `storage` — required to persist the user's rules and groups between sessions.
-- `scripting` — required to inject the page-world script that mocks `fetch` and `XMLHttpRequest` response bodies.
 - `<all_urls>` host permission — required because users may choose to mock requests from any site they visit; we only inject when a matching rule is present, and we never exfiltrate page content.
 
 ## Single-purpose statement
