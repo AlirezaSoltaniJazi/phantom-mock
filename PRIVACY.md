@@ -23,7 +23,6 @@ and configuration are stored locally inside your browser via
 | -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `declarativeNetRequest`, `declarativeNetRequestFeedback` | Implement header overwrite rules at the network layer.                                                                                                                          |
 | `storage`                                                | Persist your rules and groups between browser sessions.                                                                                                                         |
-| `scripting`                                              | Inject the page-world mocking script that patches `fetch` and `XMLHttpRequest` so we can mock response bodies for REST APIs.                                                    |
 | `<all_urls>` host permission                             | Required to inject the mocking script on whichever site you choose to mock. Phantom Mock does not phone home; the host permission is used purely to apply the rules you define. |
 
 ## Third parties
