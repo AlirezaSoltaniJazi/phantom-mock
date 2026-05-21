@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type JSX } from 'react';
 import { createRoot } from 'react-dom/client';
 import { MESSAGE_TYPES } from '@/shared/constants';
 import { isRuntimeMessage, sendMessage, type StateMutation } from '@/shared/messages';
