@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type JSX } from 'react';
 import {
   CAPTURE_COLUMN_LABELS,
   CAPTURE_COLUMN_ORDER,
