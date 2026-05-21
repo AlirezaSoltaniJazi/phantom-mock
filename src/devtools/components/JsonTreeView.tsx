@@ -4,6 +4,7 @@ import {
   useImperativeHandle,
   useRef,
   useState,
+  type JSX,
   type KeyboardEvent,
 } from 'react';
 

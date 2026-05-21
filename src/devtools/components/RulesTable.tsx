@@ -1,3 +1,4 @@
+import type { JSX } from 'react';
 import type { AppState, Group, Rule } from '@/shared/types';
 import type { StateMutation } from '@/shared/messages';
 import { newId } from '@/utils/id';
