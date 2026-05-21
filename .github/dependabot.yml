@@ -15,6 +15,13 @@ updates:
           - '@eslint/*'
           - 'eslint-*'
           - '@typescript-eslint/*'
+      vite-stack:
+        patterns:
+          - 'vite'
+          - 'vitest'
+          - '@vitest/*'
+          - '@vitejs/*'
+          - '@crxjs/vite-plugin'
       minor-and-patch:
         update-types:
           - minor
