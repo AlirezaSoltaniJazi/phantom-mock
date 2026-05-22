@@ -85,10 +85,11 @@ function Popup(): JSX.Element {
         <label className="pop-master">
           <input
             type="checkbox"
+            className="pm-toggle"
             checked={state.masterEnabled}
             onChange={(e) => mutate({ kind: 'setMasterEnabled', enabled: e.target.checked })}
           />
-          On
+          {state.masterEnabled ? 'On' : 'Off'}
         </label>
       </div>
       <div className="pop-body">
