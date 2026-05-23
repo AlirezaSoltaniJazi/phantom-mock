@@ -7,7 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.1.2] - 2026-05-18
+### Changed
+
+- Upgraded React from 18.3 to 19.2, including `@types/react` and
+  `@types/react-dom`. Added explicit `type JSX` imports across components
+  (`panel.tsx`, `popup/main.tsx`, `RuleEditor`, `RulesTable`, `Capture`,
+  `PromoteToRule`, `HitLog`, `JsonTreeView`, `Settings`) to match React 19's
+  JSX-namespace changes.
+- Upgraded the Vite toolchain: Vite 5.4 → 8.0, `@vitejs/plugin-react` 4.3 →
+  6.0, `vitest` 2.1 → 4.1, `@vitest/coverage-v8` 2.1 → 4.1.
+- Upgraded ESLint stack: `eslint` 9.15 → 10.4, `@eslint/js` 9.15 → 10.0,
+  `eslint-plugin-react-hooks` 5.0 → 7.1, `eslint-plugin-react-refresh` 0.4 →
+  0.5, `eslint-config-prettier` 9.1 → 10.1, `@typescript-eslint/*` 8.15 →
+  8.59.
+- Upgraded `@types/chrome` to 0.1.42.
+- CI now runs the test matrix on Node 20 and 22 (was 18 and 20).
+- `dependabot.yml` now groups Vite-related packages so version bumps come in
+  a single coordinated PR.
+
+## [0.1.3] - 2026-05-18
+
+### Changed
+
+- Removed the `scripting` permission from `manifest.json` and from all
+  store-listing copy. The permission was declared but never used at runtime
+  (page-world script injection is handled by the `content_scripts` entry
+  with `"world": "MAIN"`, which doesn't require this permission). Removed
+  to comply with Chrome Web Store policy (rejection code "Purple
+  Potassium"); the resubmission passed.
+
+## [0.1.1] - 2026-05-17
 
 ### Added
 
@@ -86,3 +115,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Chrome Web Store submission assets: `PRIVACY.md`, `store-assets/listing.md`,
   `store-assets/SUBMISSION-CHECKLIST.md`, placeholder screenshots and promo
   tile.
+
+### Submission notes
+
+- First Chrome Web Store submission. **Rejected** by automated review for
+  declaring the `scripting` permission without using it ("Purple Potassium"
+  violation). Never publicly available. Fixed in 0.1.3.
+
+## [0.1.0] - 2026-05-17
+
+### Added
+
+- Initial scaffold of the Phantom Mock Chrome MV3 extension. Never submitted
+  to the Chrome Web Store. All user-facing features arrived in 0.1.1.
