@@ -1,9 +1,14 @@
 import { useMemo, useRef, useState, type JSX } from 'react';
 import {
   applyImport,
+  applyImportWithResolutions,
   buildSelectiveExportBundle,
+  detectConflicts,
   filterBundle,
   parseExportBundle,
+  type ConflictResolution,
+  type ImportConflicts,
+  type ImportResolutions,
 } from '@/shared/import-export';
 import {
   FONT_SIZE_PX,
@@ -209,6 +214,11 @@ function ImportPanel({
     groups: Set<string>;
     rules: Set<string>;
   } | null>(null);
+  const [conflicts, setConflicts] = useState<ImportConflicts | null>(null);
+  const [resolutions, setResolutions] = useState<ImportResolutions>(() => ({
+    rules: new Map(),
+    groups: new Map(),
+  }));
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement | null>(null);
@@ -222,6 +232,7 @@ function ImportPanel({
       setError(parsed.error);
       setBundle(null);
       setSelection(null);
+      setConflicts(null);
       return;
     }
     setBundle(parsed.value);
@@ -229,6 +240,18 @@ function ImportPanel({
       groups: new Set(parsed.value.groups.map((g) => g.id)),
       rules: new Set(parsed.value.rules.map((r) => r.id)),
     });
+    const conf = detectConflicts(state, parsed.value);
+    setConflicts(conf);
+    // Default every conflict to "overwrite" (matches the legacy merge-by-id
+    // behaviour). The user can flip individual conflicts to "rename".
+    setResolutions({
+      rules: new Map([...conf.ruleIds].map((id) => [id, 'overwrite' as const])),
+      groups: new Map([...conf.groupIds].map((id) => [id, 'overwrite' as const])),
+    });
+  }
+
+  function setRuleResolution(ruleId: string, res: ConflictResolution): void {
+    setResolutions((prev) => ({ ...prev, rules: new Map(prev.rules).set(ruleId, res) }));
   }
 
   function toggleGroup(g: Group): void {
@@ -265,13 +288,22 @@ function ImportPanel({
       setError('Select at least one rule or group to import.');
       return;
     }
-    const next = applyImport(state, filtered, strategy);
+    const next =
+      strategy === 'merge-by-id'
+        ? applyImportWithResolutions(state, filtered, resolutions)
+        : applyImport(state, filtered, strategy);
     await mutate({ kind: 'replaceState', state: next });
+    const renames = [...resolutions.rules.values()].filter((r) => r === 'rename').length;
     setInfo(
-      `Imported ${filtered.rules.length} rule(s) and ${filtered.groups.length} group(s) using "${strategy}".`
+      `Imported ${filtered.rules.length} rule(s) and ${filtered.groups.length} group(s)` +
+        (strategy === 'merge-by-id' && renames > 0
+          ? ` (${renames} renamed to avoid id conflict).`
+          : '.')
     );
     setBundle(null);
     setSelection(null);
+    setConflicts(null);
+    setResolutions({ rules: new Map(), groups: new Map() });
     if (fileRef.current) fileRef.current.value = '';
   }
 
@@ -324,6 +356,9 @@ function ImportPanel({
             selection={selection}
             onToggleGroup={toggleGroup}
             onToggleRule={toggleRule}
+            conflicts={strategy === 'merge-by-id' ? conflicts : null}
+            resolutions={resolutions}
+            onSetRuleResolution={setRuleResolution}
           />
         </>
       ) : null}
@@ -338,6 +373,9 @@ interface SelectionTreeProps {
   selection: { groups: Set<string>; rules: Set<string> };
   onToggleGroup: (g: Group) => void;
   onToggleRule: (r: Rule) => void;
+  conflicts?: ImportConflicts | null;
+  resolutions?: ImportResolutions;
+  onSetRuleResolution?: (ruleId: string, res: ConflictResolution) => void;
 }
 
 function SelectionTree({
@@ -345,6 +383,9 @@ function SelectionTree({
   selection,
   onToggleGroup,
   onToggleRule,
+  conflicts,
+  resolutions,
+  onSetRuleResolution,
 }: SelectionTreeProps): JSX.Element {
   const groups = [...state.groups].sort((a, b) => a.order - b.order);
   return (
@@ -352,6 +393,7 @@ function SelectionTree({
       {groups.map((g) => {
         const rules = state.rules.filter((r) => r.groupId === g.id);
         const allOn = rules.length > 0 && rules.every((r) => selection.rules.has(r.id));
+        const groupConflict = conflicts?.groupIds.has(g.id) ?? false;
         return (
           <div key={g.id} className="pm-selection-group">
             <label className="pm-checkbox">
@@ -366,39 +408,97 @@ function SelectionTree({
               />
               <strong>{g.name}</strong>
               <span style={{ color: 'var(--fg-muted)' }}> · {rules.length}</span>
+              {groupConflict ? (
+                <span
+                  className="pm-conflict-hint"
+                  title="A group with this ID already exists — imported rules will land in your existing group; the existing group's name and settings are not changed."
+                >
+                  · merging into existing group
+                </span>
+              ) : null}
             </label>
             <div style={{ paddingLeft: 24 }}>
               {rules.length === 0 ? (
                 <em style={{ color: 'var(--fg-muted)' }}>No rules.</em>
               ) : (
-                rules.map((r) => (
-                  <label className="pm-checkbox" key={r.id} style={{ display: 'flex' }}>
-                    <input
-                      type="checkbox"
-                      checked={selection.rules.has(r.id)}
-                      onChange={() => onToggleRule(r)}
-                    />
-                    <span className={`pm-badge ${r.action.kind}`}>
-                      {r.action.kind.toUpperCase()}
-                    </span>
-                    <span className="pm-method" style={{ marginLeft: 6 }}>
-                      {r.match.method}
-                    </span>
-                    <span style={{ marginLeft: 6, flex: 1 }} title={r.match.urlPattern}>
-                      <strong>{r.name}</strong>
-                      <br />
-                      <small style={{ color: 'var(--fg-muted)' }}>
-                        {r.match.urlMatchType}: {r.match.urlPattern}
-                      </small>
-                    </span>
-                  </label>
-                ))
+                rules.map((r) => {
+                  const ruleConflict = conflicts?.ruleIds.has(r.id) ?? false;
+                  const ruleResolution = resolutions?.rules.get(r.id);
+                  return (
+                    <div key={r.id} className="pm-selection-rule-wrap">
+                      <label className="pm-checkbox" style={{ display: 'flex' }}>
+                        <input
+                          type="checkbox"
+                          checked={selection.rules.has(r.id)}
+                          onChange={() => onToggleRule(r)}
+                        />
+                        <span className={`pm-badge ${r.action.kind}`}>
+                          {r.action.kind.toUpperCase()}
+                        </span>
+                        <span className="pm-method" style={{ marginLeft: 6 }}>
+                          {r.match.method}
+                        </span>
+                        <span style={{ marginLeft: 6, flex: 1 }} title={r.match.urlPattern}>
+                          <strong>{r.name}</strong>
+                          <br />
+                          <small style={{ color: 'var(--fg-muted)' }}>
+                            {r.match.urlMatchType}: {r.match.urlPattern}
+                          </small>
+                        </span>
+                      </label>
+                      {ruleConflict && onSetRuleResolution ? (
+                        <div className="pm-conflict-row">
+                          <span className="pm-conflict-badge">⚠ already exists</span>
+                          <ConflictRadio
+                            name={`rule-${r.id}`}
+                            resolution={ruleResolution}
+                            onChange={(res) => onSetRuleResolution(r.id, res)}
+                          />
+                        </div>
+                      ) : null}
+                    </div>
+                  );
+                })
               )}
             </div>
           </div>
         );
       })}
     </div>
+  );
+}
+
+function ConflictRadio({
+  name,
+  resolution,
+  onChange,
+}: {
+  name: string;
+  resolution: ConflictResolution | undefined;
+  onChange: (res: ConflictResolution) => void;
+}): JSX.Element {
+  const value = resolution ?? 'overwrite';
+  return (
+    <span className="pm-conflict-radios" role="radiogroup">
+      <label>
+        <input
+          type="radio"
+          name={name}
+          checked={value === 'overwrite'}
+          onChange={() => onChange('overwrite')}
+        />{' '}
+        Overwrite
+      </label>
+      <label>
+        <input
+          type="radio"
+          name={name}
+          checked={value === 'rename'}
+          onChange={() => onChange('rename')}
+        />{' '}
+        Rename as new
+      </label>
+    </span>
   );
 }
 

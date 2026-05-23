@@ -423,6 +423,44 @@ button.pm-json-clickable {
   margin-bottom: 0;
 }
 
+.pm-selection-rule-wrap {
+  margin-bottom: 4px;
+}
+
+.pm-conflict-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 0 4px 24px;
+  font-size: calc(var(--pm-font-size) - 1px);
+  color: var(--fg-muted);
+}
+
+.pm-conflict-badge {
+  color: var(--warning);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.pm-conflict-radios {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+.pm-conflict-radios label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+}
+
+.pm-conflict-hint {
+  color: var(--fg-muted);
+  font-size: 11px;
+  margin-left: 8px;
+  font-style: italic;
+}
+
 .pm-capture {
   display: flex;
   flex-direction: column;
