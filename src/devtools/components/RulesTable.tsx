@@ -1,4 +1,4 @@
-import { useState, type JSX } from 'react';
+import { useMemo, useState, type JSX } from 'react';
 import type { AppState, Group, Rule } from '@/shared/types';
 import type { StateMutation } from '@/shared/messages';
 import { newId } from '@/utils/id';
@@ -21,6 +21,17 @@ export function RulesTable({ state, onEdit, mutate }: Props): JSX.Element {
 
   // Per-group collapse state — session-only, not persisted.
   const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(() => new Set());
+  // Rule multi-select state — also session-only.
+  const [selectedRules, setSelectedRules] = useState<ReadonlySet<string>>(() => new Set());
+
+  // Drop any selected ids that no longer exist (e.g. after a bulk delete or
+  // an external state replacement). Cheap recompute on every render.
+  const validSelected = useMemo<Set<string>>(() => {
+    const next = new Set<string>();
+    const existing = new Set(state.rules.map((r) => r.id));
+    for (const id of selectedRules) if (existing.has(id)) next.add(id);
+    return next;
+  }, [selectedRules, state.rules]);
 
   function toggleGroupOpen(id: string): void {
     setCollapsed((prev) => {
@@ -35,6 +46,40 @@ export function RulesTable({ state, onEdit, mutate }: Props): JSX.Element {
   }
   function expandAll(): void {
     setCollapsed(new Set());
+  }
+
+  function toggleRuleSelected(ruleId: string): void {
+    setSelectedRules((prev) => {
+      const next = new Set(prev);
+      if (next.has(ruleId)) next.delete(ruleId);
+      else next.add(ruleId);
+      return next;
+    });
+  }
+  function selectAllInGroup(groupId: string, on: boolean): void {
+    const ids = (rulesByGroup.get(groupId) ?? []).map((r) => r.id);
+    setSelectedRules((prev) => {
+      const next = new Set(prev);
+      for (const id of ids) {
+        if (on) next.add(id);
+        else next.delete(id);
+      }
+      return next;
+    });
+  }
+  function clearSelection(): void {
+    setSelectedRules(new Set());
+  }
+  async function deleteSelected(): Promise<void> {
+    const count = validSelected.size;
+    if (count === 0) return;
+    if (!window.confirm(`Delete ${count} selected rule${count === 1 ? '' : 's'}?`)) return;
+    // Sequential to keep the SW state updates in deterministic order; the
+    // mutation cost is tiny per rule.
+    for (const id of validSelected) {
+      await mutate({ kind: 'deleteRule', ruleId: id });
+    }
+    setSelectedRules(new Set());
   }
 
   function addGroup(): void {
@@ -83,9 +128,26 @@ export function RulesTable({ state, onEdit, mutate }: Props): JSX.Element {
         </button>
       </div>
 
+      {validSelected.size > 0 ? (
+        <div className="pm-bulk-bar">
+          <span>
+            <strong>{validSelected.size}</strong> rule{validSelected.size === 1 ? '' : 's'} selected
+          </span>
+          <div style={{ flex: 1 }} />
+          <button className="pm-btn secondary" type="button" onClick={clearSelection}>
+            Clear selection
+          </button>
+          <button className="pm-btn danger" type="button" onClick={() => void deleteSelected()}>
+            Delete selected
+          </button>
+        </div>
+      ) : null}
+
       {groups.map((g) => {
         const isCollapsed = collapsed.has(g.id);
         const groupRules = rulesByGroup.get(g.id) ?? [];
+        const selectedInGroup = groupRules.filter((r) => validSelected.has(r.id)).length;
+        const allSelected = groupRules.length > 0 && selectedInGroup === groupRules.length;
         return (
           <div className="pm-group" key={g.id}>
             <div className="pm-group-header">
@@ -102,6 +164,18 @@ export function RulesTable({ state, onEdit, mutate }: Props): JSX.Element {
               </button>
               <input
                 type="checkbox"
+                title="Select all rules in this group"
+                className="pm-rule-select"
+                checked={allSelected}
+                ref={(el) => {
+                  if (!el) return;
+                  el.indeterminate = selectedInGroup > 0 && !allSelected;
+                }}
+                onChange={(e) => selectAllInGroup(g.id, e.target.checked)}
+              />
+              <input
+                type="checkbox"
+                title="Enable / disable this group"
                 checked={g.enabled}
                 onChange={(e) =>
                   mutate({ kind: 'toggleGroup', groupId: g.id, enabled: e.target.checked })
@@ -137,43 +211,58 @@ export function RulesTable({ state, onEdit, mutate }: Props): JSX.Element {
             {isCollapsed ? null : groupRules.length === 0 ? (
               <div className="pm-empty">No rules in this group.</div>
             ) : (
-              groupRules.map((rule) => (
-                <div className="pm-rule" key={rule.id}>
-                  <input
-                    type="checkbox"
-                    checked={rule.enabled}
-                    onChange={(e) =>
-                      mutate({ kind: 'toggleRule', ruleId: rule.id, enabled: e.target.checked })
-                    }
-                  />
-                  <span className={`pm-badge ${rule.action.kind}`}>
-                    {rule.action.kind.toUpperCase()}
-                  </span>
-                  <span className="pm-method">{rule.match.method}</span>
-                  <span className="pm-url" title={rule.match.urlPattern}>
-                    <strong>{rule.name}</strong>
-                    <br />
-                    <small>
-                      {rule.match.urlMatchType}: {rule.match.urlPattern}
-                    </small>
-                  </span>
-                  <div className="pm-row">
-                    <button className="pm-btn secondary" type="button" onClick={() => onEdit(rule)}>
-                      Edit
-                    </button>
-                    <button
-                      className="pm-btn danger"
-                      type="button"
-                      onClick={() => {
-                        if (!window.confirm(`Delete rule "${rule.name}"?`)) return;
-                        void mutate({ kind: 'deleteRule', ruleId: rule.id });
-                      }}
-                    >
-                      Delete
-                    </button>
+              groupRules.map((rule) => {
+                const isSelected = validSelected.has(rule.id);
+                return (
+                  <div className={`pm-rule ${isSelected ? 'is-selected' : ''}`} key={rule.id}>
+                    <input
+                      type="checkbox"
+                      className="pm-rule-select"
+                      title="Select for bulk actions"
+                      checked={isSelected}
+                      onChange={() => toggleRuleSelected(rule.id)}
+                    />
+                    <input
+                      type="checkbox"
+                      title="Enable / disable this rule"
+                      checked={rule.enabled}
+                      onChange={(e) =>
+                        mutate({ kind: 'toggleRule', ruleId: rule.id, enabled: e.target.checked })
+                      }
+                    />
+                    <span className={`pm-badge ${rule.action.kind}`}>
+                      {rule.action.kind.toUpperCase()}
+                    </span>
+                    <span className="pm-method">{rule.match.method}</span>
+                    <span className="pm-url" title={rule.match.urlPattern}>
+                      <strong>{rule.name}</strong>
+                      <br />
+                      <small>
+                        {rule.match.urlMatchType}: {rule.match.urlPattern}
+                      </small>
+                    </span>
+                    <div className="pm-row">
+                      <button
+                        className="pm-btn secondary"
+                        type="button"
+                        onClick={() => onEdit(rule)}
+                      >
+                        Edit
+                      </button>
+                      <button
+                        className="pm-btn danger"
+                        type="button"
+                        onClick={() => {
+                          if (!window.confirm(`Delete rule "${rule.name}"?`)) return;
+                          void mutate({ kind: 'deleteRule', ruleId: rule.id });
+                        }}
+                      >
+                        Delete
+                      </button>
+                    </div>
                   </div>
-                </div>
-              ))
+                );
+              })
             )}
           </div>
         );

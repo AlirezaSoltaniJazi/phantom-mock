@@ -136,7 +136,7 @@ html,
 
 .pm-rule {
   display: grid;
-  grid-template-columns: auto 70px 80px 1fr auto;
+  grid-template-columns: auto auto 70px 80px 1fr auto;
   gap: 8px;
   align-items: center;
   padding: 8px 12px;
@@ -146,6 +146,31 @@ html,
 
 .pm-rule:first-child {
   border-top: none;
+}
+
+.pm-rule.is-selected {
+  background: color-mix(in srgb, var(--accent) 12%, var(--bg));
+}
+
+/* Visual distinction between "select-for-bulk-action" checkbox and the
+   enable / disable checkbox. The select checkbox is rendered slightly
+   smaller and in the accent colour so users can tell them apart at a
+   glance. */
+.pm-rule-select {
+  accent-color: var(--accent);
+  transform: scale(0.9);
+  cursor: pointer;
+}
+
+.pm-bulk-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  margin-bottom: 8px;
+  background: color-mix(in srgb, var(--accent) 12%, var(--bg-alt));
+  border: 1px solid var(--accent);
+  border-radius: 6px;
 }
 
 .pm-badge {
