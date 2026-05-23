@@ -11,8 +11,16 @@ const HEADER_OP_MAP: Record<HeaderOp['op'], chrome.declarativeNetRequest.HeaderO
   remove: chrome.declarativeNetRequest?.HeaderOperation?.REMOVE ?? ('remove' as never),
 };
 
+// Header rules apply to anything DNR can see: XHR/fetch (the original REST
+// scope), plus page navigations and iframe loads (so X-Tenant-ID / Auth /
+// etc. headers can be injected when the user clicks a link or opens a tab).
+// Mock rules — which are NOT done through DNR — still operate only on fetch
+// and XHR; that's a property of the page-world patcher in src/injected/.
+const RT = chrome.declarativeNetRequest?.ResourceType;
 const RESOURCE_TYPES: chrome.declarativeNetRequest.ResourceType[] = [
-  chrome.declarativeNetRequest?.ResourceType?.XMLHTTPREQUEST ?? ('xmlhttprequest' as never),
+  RT?.XMLHTTPREQUEST ?? ('xmlhttprequest' as never),
+  RT?.MAIN_FRAME ?? ('main_frame' as never),
+  RT?.SUB_FRAME ?? ('sub_frame' as never),
 ];
 
 function ruleIdFor(rule: Rule): number {

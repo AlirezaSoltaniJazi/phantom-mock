@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type JSX } from 'react';
 import { MESSAGE_TYPES, PORT_NAMES } from '@/shared/constants';
 import { sendMessage } from '@/shared/messages';
 import type { MockHit } from '@/shared/types';

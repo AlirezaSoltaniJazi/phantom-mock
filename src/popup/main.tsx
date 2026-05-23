@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type JSX } from 'react';
 import { createRoot } from 'react-dom/client';
 import { MESSAGE_TYPES } from '@/shared/constants';
 import { isRuntimeMessage, sendMessage, type StateMutation } from '@/shared/messages';
@@ -15,11 +15,21 @@ import './styles.css';
 function Popup(): JSX.Element {
   const [state, setState] = useState<AppState | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(() => new Set());
   const { fontSizePx } = usePrefs();
 
   useEffect(() => {
     applyFontSizeVar(document.documentElement, fontSizePx);
   }, [fontSizePx]);
+
+  function toggleGroupOpen(id: string): void {
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
 
   useEffect(() => {
     void refresh();
@@ -82,15 +92,36 @@ function Popup(): JSX.Element {
     <div className="pop">
       <div className="pop-header">
         <span className="pop-title">Phantom Mock</span>
-        <label className="pop-master">
+        <label
+          className="pop-master"
+          title={
+            state.masterEnabled
+              ? 'Phantom Mock is on — click to disable'
+              : 'Phantom Mock is off — click to enable'
+          }
+        >
           <input
             type="checkbox"
+            className="pm-toggle"
             checked={state.masterEnabled}
             onChange={(e) => mutate({ kind: 'setMasterEnabled', enabled: e.target.checked })}
           />
-          On
         </label>
       </div>
+      {groups.length > 0 ? (
+        <div className="pop-subbar">
+          <button type="button" className="pop-btn-link" onClick={() => setCollapsed(new Set())}>
+            Expand all
+          </button>
+          <button
+            type="button"
+            className="pop-btn-link"
+            onClick={() => setCollapsed(new Set(groups.map((g) => g.id)))}
+          >
+            Collapse all
+          </button>
+        </div>
+      ) : null}
       <div className="pop-body">
         {state.rules.length === 0 ? (
           <div className="pop-empty">
@@ -100,11 +131,25 @@ function Popup(): JSX.Element {
           groups.map((g) => {
             const groupRules = rulesByGroup.get(g.id) ?? [];
             const buckets = bucketByBaseDomain(groupRules, ruleToUrl);
+            const isCollapsed = collapsed.has(g.id);
             return (
               <div key={g.id}>
                 <div className="pop-group">
+                  <button
+                    type="button"
+                    className="pop-chevron-btn"
+                    aria-label={isCollapsed ? 'Expand group' : 'Collapse group'}
+                    aria-expanded={!isCollapsed}
+                    onClick={() => toggleGroupOpen(g.id)}
+                  >
+                    <span className={`pop-chevron ${isCollapsed ? 'collapsed' : ''}`} aria-hidden>
+                      ▾
+                    </span>
+                  </button>
                   <input
                     type="checkbox"
+                    className="pm-toggle pm-toggle-sm"
+                    title="Enable / disable this group"
                     checked={g.enabled}
                     onChange={(e) =>
                       mutate({ kind: 'toggleGroup', groupId: g.id, enabled: e.target.checked })
@@ -113,57 +158,65 @@ function Popup(): JSX.Element {
                   <span style={{ flex: 1 }}>{g.name}</span>
                   <small>{groupRules.length}</small>
                 </div>
-                {buckets.map((bucket, bi) => {
-                  const subBuckets = bucketBySubdomain(bucket.items, ruleToUrl);
-                  return (
-                    <div className="pop-host-bucket" key={`${g.id}-${bi}`}>
-                      <div className="pop-host" title={bucket.baseDomain ?? 'No host'}>
-                        <SchemeIcon scheme={bucket.scheme} />
-                        <span className="pop-host-name">{bucket.baseDomain ?? '(no host)'}</span>
-                        <small>{bucket.items.length}</small>
-                      </div>
-                      {subBuckets.map((sub, si) => (
-                        <div className="pop-subhost-bucket" key={`${g.id}-${bi}-${si}`}>
-                          <div
-                            className="pop-subhost"
-                            title={sub.subdomain ?? `(${bucket.baseDomain ?? 'no host'})`}
-                          >
-                            <span className="pop-subhost-name">{sub.subdomain ?? '(root)'}</span>
-                            <small>{sub.items.length}</small>
+                {isCollapsed
+                  ? null
+                  : buckets.map((bucket, bi) => {
+                      const subBuckets = bucketBySubdomain(bucket.items, ruleToUrl);
+                      return (
+                        <div className="pop-host-bucket" key={`${g.id}-${bi}`}>
+                          <div className="pop-host" title={bucket.baseDomain ?? 'No host'}>
+                            <SchemeIcon scheme={bucket.scheme} />
+                            <span className="pop-host-name">
+                              {bucket.baseDomain ?? '(no host)'}
+                            </span>
+                            <small>{bucket.items.length}</small>
                           </div>
-                          {sub.items.map((rule) => {
-                            const parts = deriveUrlParts(rule);
-                            return (
-                              <div className="pop-rule" key={rule.id}>
-                                <input
-                                  type="checkbox"
-                                  checked={rule.enabled}
-                                  onChange={(e) =>
-                                    mutate({
-                                      kind: 'toggleRule',
-                                      ruleId: rule.id,
-                                      enabled: e.target.checked,
-                                    })
-                                  }
-                                />
-                                <span className={`pop-badge ${rule.action.kind}`}>
-                                  {rule.action.kind.toUpperCase()}
+                          {subBuckets.map((sub, si) => (
+                            <div className="pop-subhost-bucket" key={`${g.id}-${bi}-${si}`}>
+                              <div
+                                className="pop-subhost"
+                                title={sub.subdomain ?? `(${bucket.baseDomain ?? 'no host'})`}
+                              >
+                                <span className="pop-subhost-name">
+                                  {sub.subdomain ?? '(root)'}
                                 </span>
-                                <span className="pop-method">{rule.match.method}</span>
-                                <span
-                                  className="pop-path"
-                                  title={`${rule.name}\n${rule.match.urlMatchType}: ${rule.match.urlPattern}`}
-                                >
-                                  <span className="pop-path-text">{parts.path || '/'}</span>
-                                </span>
+                                <small>{sub.items.length}</small>
                               </div>
-                            );
-                          })}
+                              {sub.items.map((rule) => {
+                                const parts = deriveUrlParts(rule);
+                                return (
+                                  <div className="pop-rule" key={rule.id}>
+                                    <input
+                                      type="checkbox"
+                                      className="pm-toggle pm-toggle-sm"
+                                      title="Enable / disable this rule"
+                                      checked={rule.enabled}
+                                      onChange={(e) =>
+                                        mutate({
+                                          kind: 'toggleRule',
+                                          ruleId: rule.id,
+                                          enabled: e.target.checked,
+                                        })
+                                      }
+                                    />
+                                    <span className={`pop-badge ${rule.action.kind}`}>
+                                      {rule.action.kind.toUpperCase()}
+                                    </span>
+                                    <span className="pop-method">{rule.match.method}</span>
+                                    <span
+                                      className="pop-path"
+                                      title={`${rule.name}\n${rule.match.urlMatchType}: ${rule.match.urlPattern}`}
+                                    >
+                                      <span className="pop-path-text">{parts.path || '/'}</span>
+                                    </span>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          ))}
                         </div>
-                      ))}
-                    </div>
-                  );
-                })}
+                      );
+                    })}
               </div>
             );
           })

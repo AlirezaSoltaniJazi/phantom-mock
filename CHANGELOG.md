@@ -7,7 +7,101 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.1.2] - 2026-05-18
+## [0.2.0] - 2026-05-23
+
+### Added
+
+- Multi-select rules in the Rules tab. Each rule row now has a small
+  selection checkbox at the far left (in the accent colour, scaled slightly
+  smaller than the enable / disable checkbox so the two are visually
+  distinct). Each group header has its own select-all checkbox with
+  tri-state (none / some / all selected) indicating how many of its rules
+  are picked. When any rule is selected, a bulk-action bar appears showing
+  the count plus **Clear selection** and **Delete selected** buttons. Bulk
+  delete asks for one confirmation, then issues one `deleteRule` mutation
+  per id. State is session-only; stale ids are pruned automatically if the
+  rule list changes underneath the user.
+- Collapse / expand groups, in both the DevTools panel's **Rules** tab and
+  the toolbar **popup**:
+  - A chevron on the left of each group header toggles just that group.
+  - **Expand all** / **Collapse all** buttons fold every group at once
+    (in the Rules-tab toolbar and a thin sub-bar at the top of the popup).
+  - State is per-panel-session / per-popup-open (not persisted).
+  - Group rule-count badge shown next to the group name.
+
+### Fixed
+
+- Service worker no longer fails to register with "Status code: 15". The
+  background entry point was renamed from `src/background/index.ts` to
+  `src/background/service-worker.ts` so `@crxjs/vite-plugin@2.4` can no
+  longer collide its chunk with `src/content/index.ts` (both used to share
+  the basename `index.ts` and CRXJS would route the SW loader to the
+  content-script bundle, which then crashed because service workers don't
+  have `document`).
+- Header rules now also apply to `main_frame` and `sub_frame` requests, not
+  just `xmlhttprequest`. Previously, custom headers like `X-Tenant-ID`
+  configured in a header rule were silently dropped on page navigations and
+  iframe loads — they only worked on fetch/XHR. Mock rules are unaffected
+  (they still run through the page-world `fetch` / `XMLHttpRequest` patcher
+  and inherently only see those two API types).
+- Empty header rows in the Rule Editor are stripped on save. A half-filled
+  row (`{ name: "", op: "set", value: "" }`) could previously survive into
+  the persisted rule and cause `chrome.declarativeNetRequest` to silently
+  reject the entire rule.
+- JSON import now silently drops header rows with an empty `name` instead of
+  rejecting the whole bundle. Old export files that pre-date the editor
+  strip-on-save fix can now be re-imported without manual JSON editing.
+- Import-conflict resolution per rule: when "Merge by id" is selected, any
+  incoming **rule** whose `id` already exists in the current state is flagged
+  with a `⚠ already exists` badge in the preview tree, with inline
+  **Overwrite** / **Rename as new** radios. Defaults to **Overwrite** (legacy
+  behaviour); selecting **Rename as new** keeps the existing rule and adds
+  the imported one with a fresh `id` and an auto-incremented name suffix
+  (`MyRule` → `MyRule (2)` → `MyRule (3)` …). **Groups** with a colliding
+  `id` are silently merged into the existing group — the user's group name,
+  enabled flag, and order are preserved, and imported rules just land inside
+  the existing group. Implemented in `applyImportWithResolutions` /
+  `detectConflicts` in `import-export.ts`.
+
+### Changed
+
+- Master switch in the popup and DevTools panel is now a sliding pill toggle
+  instead of a native checkbox. Behaviour identical (`checked` state still
+  binds to `state.masterEnabled`); CSS-only via a new `.pm-toggle` class.
+- Per-group and per-rule **enable/disable** checkboxes in both the popup and
+  the DevTools panel's Rules tab are now compact toggle pills
+  (`.pm-toggle.pm-toggle-sm` — 26-28 px wide), so the visual language is
+  consistent across master, group and rule level. The bulk-select checkbox
+  in the Rules tab stays a standard square checkbox so it's visually
+  distinct from the enable toggles.
+- Upgraded React from 18.3 to 19.2, including `@types/react` and
+  `@types/react-dom`. Added explicit `type JSX` imports across components
+  (`panel.tsx`, `popup/main.tsx`, `RuleEditor`, `RulesTable`, `Capture`,
+  `PromoteToRule`, `HitLog`, `JsonTreeView`, `Settings`) to match React 19's
+  JSX-namespace changes.
+- Upgraded the Vite toolchain: Vite 5.4 → 8.0, `@vitejs/plugin-react` 4.3 →
+  6.0, `vitest` 2.1 → 4.1, `@vitest/coverage-v8` 2.1 → 4.1.
+- Upgraded ESLint stack: `eslint` 9.15 → 10.4, `@eslint/js` 9.15 → 10.0,
+  `eslint-plugin-react-hooks` 5.0 → 7.1, `eslint-plugin-react-refresh` 0.4 →
+  0.5, `eslint-config-prettier` 9.1 → 10.1, `@typescript-eslint/*` 8.15 →
+  8.59.
+- Upgraded `@types/chrome` to 0.1.42.
+- CI now runs the test matrix on Node 20 and 22 (was 18 and 20).
+- `dependabot.yml` now groups Vite-related packages so version bumps come in
+  a single coordinated PR.
+
+## [0.1.3] - 2026-05-18
+
+### Changed
+
+- Removed the `scripting` permission from `manifest.json` and from all
+  store-listing copy. The permission was declared but never used at runtime
+  (page-world script injection is handled by the `content_scripts` entry
+  with `"world": "MAIN"`, which doesn't require this permission). Removed
+  to comply with Chrome Web Store policy (rejection code "Purple
+  Potassium"); the resubmission passed.
+
+## [0.1.1] - 2026-05-17
 
 ### Added
 
@@ -86,3 +180,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Chrome Web Store submission assets: `PRIVACY.md`, `store-assets/listing.md`,
   `store-assets/SUBMISSION-CHECKLIST.md`, placeholder screenshots and promo
   tile.
+
+### Submission notes
+
+- First Chrome Web Store submission. **Rejected** by automated review for
+  declaring the `scripting` permission without using it ("Purple Potassium"
+  violation). Never publicly available. Fixed in 0.1.3.
+
+## [0.1.0] - 2026-05-17
+
+### Added
+
+- Initial scaffold of the Phantom Mock Chrome MV3 extension. Never submitted
+  to the Chrome Web Store. All user-facing features arrived in 0.1.1.

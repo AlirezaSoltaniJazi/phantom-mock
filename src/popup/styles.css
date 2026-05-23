@@ -217,3 +217,100 @@ body {
   text-align: center;
   color: var(--fg-muted);
 }
+
+/* Toggle switch (replaces native checkbox for the master switch). */
+.pm-toggle {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 32px;
+  height: 18px;
+  background: var(--border);
+  border-radius: 9999px;
+  position: relative;
+  cursor: pointer;
+  transition: background 0.15s ease;
+  margin: 0;
+  flex-shrink: 0;
+  vertical-align: middle;
+}
+.pm-toggle::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  background: #fff;
+  border-radius: 50%;
+  transition: transform 0.15s ease;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+.pm-toggle:checked {
+  background: var(--accent);
+}
+.pm-toggle:checked::after {
+  transform: translateX(14px);
+}
+.pm-toggle:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Compact variant used inline on group / rule rows. */
+.pm-toggle.pm-toggle-sm {
+  width: 26px;
+  height: 14px;
+}
+.pm-toggle.pm-toggle-sm::after {
+  width: 10px;
+  height: 10px;
+}
+.pm-toggle.pm-toggle-sm:checked::after {
+  transform: translateX(12px);
+}
+
+/* Sub-toolbar with Expand all / Collapse all */
+.pop-subbar {
+  display: flex;
+  gap: 12px;
+  padding: 4px 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-alt);
+}
+.pop-btn-link {
+  background: transparent;
+  border: none;
+  padding: 0;
+  color: var(--accent);
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+.pop-btn-link:hover {
+  text-decoration: underline;
+}
+
+/* Per-group chevron */
+.pop-chevron-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 0 2px;
+  color: var(--fg-muted);
+  font: inherit;
+  line-height: 1;
+}
+.pop-chevron-btn:hover {
+  color: var(--fg);
+}
+.pop-chevron {
+  display: inline-block;
+  transition: transform 0.12s ease;
+  font-size: 14px;
+}
+.pop-chevron.collapsed {
+  transform: rotate(-90deg);
+}

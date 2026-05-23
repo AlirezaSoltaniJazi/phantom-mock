@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type JSX } from 'react';
 import { createRoot } from 'react-dom/client';
 import { useAppState } from './state-hook';
 import { RulesTable } from './components/RulesTable';
@@ -109,9 +109,13 @@ function App(): JSX.Element {
           Settings
         </button>
         <div style={{ flex: 1 }} />
-        <label className="pm-checkbox" style={{ marginRight: 12 }}>
+        <label
+          className="pm-checkbox"
+          style={{ marginRight: 12, display: 'inline-flex', gap: 8, alignItems: 'center' }}
+        >
           <input
             type="checkbox"
+            className="pm-toggle"
             checked={state.masterEnabled}
             onChange={(e) => mutate({ kind: 'setMasterEnabled', enabled: e.target.checked })}
           />

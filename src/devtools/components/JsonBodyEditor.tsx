@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState, type JSX } from 'react';
 import { JsonTreeView, type JsonTreeHandle } from './JsonTreeView';
 
 interface Props {

@@ -264,8 +264,11 @@ function validateHeaderOps(value: unknown, path: string): Result<HeaderOp[]> {
       return { ok: false, error: `${path}[${i}] must be an object` };
     }
     const h = item as Record<string, unknown>;
-    if (typeof h.name !== 'string' || h.name.length === 0) {
-      return { ok: false, error: `${path}[${i}].name must be a non-empty string` };
+    // Half-filled header rows (empty name) may exist in older exports because
+    // the editor used to allow saving them. Silently drop them rather than
+    // failing the whole import — mirrors the editor's strip-on-save behaviour.
+    if (typeof h.name !== 'string' || h.name.trim().length === 0) {
+      continue;
     }
     if (h.op !== 'set' && h.op !== 'append' && h.op !== 'remove') {
       return { ok: false, error: `${path}[${i}].op must be set, append, or remove` };
@@ -337,4 +340,86 @@ function generateId(prefix: string): string {
       ? cryptoLike.randomUUID()
       : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
   return `${prefix}_${suffix}`;
+}
+
+// ── Per-conflict resolution import ────────────────────────────────────────
+
+export type ConflictResolution = 'overwrite' | 'rename';
+
+export interface ImportConflicts {
+  ruleIds: Set<string>;
+  groupIds: Set<string>;
+}
+
+export interface ImportResolutions {
+  rules: Map<string, ConflictResolution>;
+  groups: Map<string, ConflictResolution>;
+}
+
+export function detectConflicts(current: AppState, bundle: ExportBundle): ImportConflicts {
+  const currentRuleIds = new Set(current.rules.map((r) => r.id));
+  const currentGroupIds = new Set(current.groups.map((g) => g.id));
+  return {
+    ruleIds: new Set(bundle.rules.filter((r) => currentRuleIds.has(r.id)).map((r) => r.id)),
+    groupIds: new Set(bundle.groups.filter((g) => currentGroupIds.has(g.id)).map((g) => g.id)),
+  };
+}
+
+/** Pick a non-conflicting name by appending `(2)`, `(3)`, ... */
+function uniqueName(baseName: string, existingNames: Set<string>): string {
+  if (!existingNames.has(baseName)) return baseName;
+  let n = 2;
+  while (existingNames.has(`${baseName} (${n})`)) n++;
+  return `${baseName} (${n})`;
+}
+
+/**
+ * Import each item from the bundle.
+ *
+ * - Groups whose `id` already exists are kept as-is — the import never
+ *   touches the user's existing group metadata (name / enabled / order).
+ *   Imported rules land inside the existing group of the matching id.
+ * - Groups whose `id` is new get added.
+ * - Rules whose `id` already exists get the resolution from
+ *   `resolutions.rules`: `overwrite` (replace by id, default) or `rename`
+ *   (keep the existing rule, add the imported one with a fresh `id` and an
+ *   auto-suffixed name).
+ * - Rules whose `id` is new get added directly.
+ */
+export function applyImportWithResolutions(
+  current: AppState,
+  bundle: ExportBundle,
+  resolutions: ImportResolutions
+): AppState {
+  const groupMap = new Map(current.groups.map((g) => [g.id, g]));
+
+  for (const g of bundle.groups) {
+    if (groupMap.has(g.id)) continue; // existing group wins — no prompt, no overwrite
+    groupMap.set(g.id, g);
+  }
+
+  const ruleMap = new Map(current.rules.map((r) => [r.id, r]));
+  const ruleNames = new Set(current.rules.map((r) => r.name));
+
+  for (const r of bundle.rules) {
+    const conflicts = ruleMap.has(r.id);
+    const resolution = resolutions.rules.get(r.id) ?? 'overwrite';
+    if (!conflicts || resolution === 'overwrite') {
+      ruleMap.set(r.id, r);
+      ruleNames.add(r.name);
+      continue;
+    }
+    // rename-as-new
+    const newId = generateId('rule');
+    const newName = uniqueName(r.name, ruleNames);
+    ruleMap.set(newId, { ...r, id: newId, name: newName });
+    ruleNames.add(newName);
+  }
+
+  return {
+    schemaVersion: CURRENT_SCHEMA_VERSION,
+    masterEnabled: current.masterEnabled,
+    groups: [...groupMap.values()],
+    rules: [...ruleMap.values()],
+  };
 }
