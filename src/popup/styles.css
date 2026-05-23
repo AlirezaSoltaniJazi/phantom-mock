@@ -255,3 +255,49 @@ body {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
+
+/* Sub-toolbar with Expand all / Collapse all */
+.pop-subbar {
+  display: flex;
+  gap: 12px;
+  padding: 4px 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-alt);
+}
+.pop-btn-link {
+  background: transparent;
+  border: none;
+  padding: 0;
+  color: var(--accent);
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+.pop-btn-link:hover {
+  text-decoration: underline;
+}
+
+/* Per-group chevron */
+.pop-chevron-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 0 2px;
+  color: var(--fg-muted);
+  font: inherit;
+  line-height: 1;
+}
+.pop-chevron-btn:hover {
+  color: var(--fg);
+}
+.pop-chevron {
+  display: inline-block;
+  transition: transform 0.12s ease;
+  font-size: 14px;
+}
+.pop-chevron.collapsed {
+  transform: rotate(-90deg);
+}
