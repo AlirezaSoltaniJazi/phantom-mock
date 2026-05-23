@@ -22,6 +22,15 @@ updates:
           - '@vitest/*'
           - '@vitejs/*'
           - '@crxjs/vite-plugin'
+      typescript-tools:
+        patterns:
+          - 'typescript'
+          - '@types/*'
+      tooling:
+        patterns:
+          - 'lint-staged'
+          - 'husky'
+          - 'prettier'
       minor-and-patch:
         update-types:
           - minor
