@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Collapse / expand groups, in both the DevTools panel's **Rules** tab and
+  the toolbar **popup**:
+  - A chevron on the left of each group header toggles just that group.
+  - **Expand all** / **Collapse all** buttons fold every group at once
+    (in the Rules-tab toolbar and a thin sub-bar at the top of the popup).
+  - State is per-panel-session / per-popup-open (not persisted).
+  - Group rule-count badge shown next to the group name.
+
 ### Fixed
 
 - Service worker no longer fails to register with "Status code: 15". The
