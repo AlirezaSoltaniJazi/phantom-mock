@@ -7,8 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Service worker no longer fails to register with "Status code: 15". The
+  background entry point was renamed from `src/background/index.ts` to
+  `src/background/service-worker.ts` so `@crxjs/vite-plugin@2.4` can no
+  longer collide its chunk with `src/content/index.ts` (both used to share
+  the basename `index.ts` and CRXJS would route the SW loader to the
+  content-script bundle, which then crashed because service workers don't
+  have `document`).
+- Header rules now also apply to `main_frame` and `sub_frame` requests, not
+  just `xmlhttprequest`. Previously, custom headers like `X-Tenant-ID`
+  configured in a header rule were silently dropped on page navigations and
+  iframe loads — they only worked on fetch/XHR. Mock rules are unaffected
+  (they still run through the page-world `fetch` / `XMLHttpRequest` patcher
+  and inherently only see those two API types).
+- Empty header rows in the Rule Editor are stripped on save. A half-filled
+  row (`{ name: "", op: "set", value: "" }`) could previously survive into
+  the persisted rule and cause `chrome.declarativeNetRequest` to silently
+  reject the entire rule.
+
 ### Changed
 
+- Master switch in the popup and DevTools panel is now a sliding pill toggle
+  instead of a native checkbox. Behaviour identical (`checked` state still
+  binds to `state.masterEnabled`); CSS-only via a new `.pm-toggle` class.
 - Upgraded React from 18.3 to 19.2, including `@types/react` and
   `@types/react-dom`. Added explicit `type JSX` imports across components
   (`panel.tsx`, `popup/main.tsx`, `RuleEditor`, `RulesTable`, `Capture`,
