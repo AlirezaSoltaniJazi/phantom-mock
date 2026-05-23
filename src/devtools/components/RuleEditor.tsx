@@ -41,6 +41,28 @@ function emptyHeader(): HeaderAction {
   return { kind: 'header', requestHeaders: [], responseHeaders: [] };
 }
 
+/**
+ * DNR rejects header ops with an empty name. Drop any half-filled rows the
+ * user left in the editor before persisting.
+ */
+function stripEmptyHeaderOps(rule: Rule): Rule {
+  const filter = (ops: HeaderOp[]): HeaderOp[] => ops.filter((o) => o.name.trim().length > 0);
+  if (rule.action.kind === 'mock') {
+    return {
+      ...rule,
+      action: { ...rule.action, responseHeaders: filter(rule.action.responseHeaders) },
+    };
+  }
+  return {
+    ...rule,
+    action: {
+      ...rule.action,
+      requestHeaders: filter(rule.action.requestHeaders),
+      responseHeaders: filter(rule.action.responseHeaders),
+    },
+  };
+}
+
 function defaultRule(groupId: string): Rule {
   return {
     id: newId('rule'),
@@ -314,7 +336,12 @@ export function RuleEditor({
         <button className="pm-btn secondary" type="button" onClick={onCancel}>
           Cancel
         </button>
-        <button className="pm-btn" type="button" disabled={!canSave} onClick={() => onSave(draft)}>
+        <button
+          className="pm-btn"
+          type="button"
+          disabled={!canSave}
+          onClick={() => onSave(stripEmptyHeaderOps(draft))}
+        >
           Save rule
         </button>
       </div>
