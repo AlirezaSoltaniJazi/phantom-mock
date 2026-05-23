@@ -675,6 +675,31 @@ button.pm-json-clickable {
   border-bottom: none;
 }
 
+/* Group collapse chevron in the Rules tab. */
+.pm-group-chevron {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 0 4px;
+  color: var(--fg-muted);
+  font: inherit;
+  line-height: 1;
+}
+.pm-group-chevron:hover {
+  color: var(--fg);
+}
+.pm-chevron {
+  display: inline-block;
+  transition: transform 0.12s ease;
+  font-size: 15px;
+}
+.pm-chevron.collapsed {
+  transform: rotate(-90deg);
+}
+
 /* Toggle switch (replaces native checkbox for the master switch). */
 .pm-toggle {
   appearance: none;
