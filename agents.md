@@ -16,7 +16,6 @@ Chrome extension (Manifest V3) that mocks REST API responses and intercepts HTTP
 | Runtime  | Chrome Extension Manifest V3                     |
 | Storage  | chrome.storage.local (typed wrappers)            |
 | Network  | declarativeNetRequest (DNR) + fetch/XHR patching |
-| DnD      | @dnd-kit                                         |
 
 ## Project Structure
 

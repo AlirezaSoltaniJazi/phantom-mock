@@ -24,9 +24,8 @@
     "forceConsistentCasingInFileNames": true,
 
     "types": ["chrome", "vitest/globals"],
-    "baseUrl": ".",
     "paths": {
-      "@/*": ["src/*"]
+      "@/*": ["./src/*"]
     }
   },
   "include": ["src/**/*", "tests/**/*", "vite.config.ts", "vitest.config.ts"],
