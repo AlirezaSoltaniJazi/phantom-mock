@@ -256,6 +256,19 @@ body {
   outline-offset: 2px;
 }
 
+/* Compact variant used inline on group / rule rows. */
+.pm-toggle.pm-toggle-sm {
+  width: 26px;
+  height: 14px;
+}
+.pm-toggle.pm-toggle-sm::after {
+  width: 10px;
+  height: 10px;
+}
+.pm-toggle.pm-toggle-sm:checked::after {
+  transform: translateX(12px);
+}
+
 /* Sub-toolbar with Expand all / Collapse all */
 .pop-subbar {
   display: flex;

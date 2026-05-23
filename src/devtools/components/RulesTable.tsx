@@ -175,6 +175,7 @@ export function RulesTable({ state, onEdit, mutate }: Props): JSX.Element {
               />
               <input
                 type="checkbox"
+                className="pm-toggle pm-toggle-sm"
                 title="Enable / disable this group"
                 checked={g.enabled}
                 onChange={(e) =>
@@ -224,6 +225,7 @@ export function RulesTable({ state, onEdit, mutate }: Props): JSX.Element {
                     />
                     <input
                       type="checkbox"
+                      className="pm-toggle pm-toggle-sm"
                       title="Enable / disable this rule"
                       checked={rule.enabled}
                       onChange={(e) =>

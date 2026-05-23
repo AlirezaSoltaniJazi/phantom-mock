@@ -92,14 +92,20 @@ function Popup(): JSX.Element {
     <div className="pop">
       <div className="pop-header">
         <span className="pop-title">Phantom Mock</span>
-        <label className="pop-master">
+        <label
+          className="pop-master"
+          title={
+            state.masterEnabled
+              ? 'Phantom Mock is on — click to disable'
+              : 'Phantom Mock is off — click to enable'
+          }
+        >
           <input
             type="checkbox"
             className="pm-toggle"
             checked={state.masterEnabled}
             onChange={(e) => mutate({ kind: 'setMasterEnabled', enabled: e.target.checked })}
           />
-          {state.masterEnabled ? 'On' : 'Off'}
         </label>
       </div>
       {groups.length > 0 ? (
@@ -142,6 +148,8 @@ function Popup(): JSX.Element {
                   </button>
                   <input
                     type="checkbox"
+                    className="pm-toggle pm-toggle-sm"
+                    title="Enable / disable this group"
                     checked={g.enabled}
                     onChange={(e) =>
                       mutate({ kind: 'toggleGroup', groupId: g.id, enabled: e.target.checked })
@@ -180,6 +188,8 @@ function Popup(): JSX.Element {
                                   <div className="pop-rule" key={rule.id}>
                                     <input
                                       type="checkbox"
+                                      className="pm-toggle pm-toggle-sm"
+                                      title="Enable / disable this rule"
                                       checked={rule.enabled}
                                       onChange={(e) =>
                                         mutate({

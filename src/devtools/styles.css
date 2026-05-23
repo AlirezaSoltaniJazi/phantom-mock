@@ -800,3 +800,16 @@ button.pm-json-clickable {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
+
+/* Compact variant used inline on group / rule rows. */
+.pm-toggle.pm-toggle-sm {
+  width: 28px;
+  height: 15px;
+}
+.pm-toggle.pm-toggle-sm::after {
+  width: 11px;
+  height: 11px;
+}
+.pm-toggle.pm-toggle-sm:checked::after {
+  transform: translateX(13px);
+}
