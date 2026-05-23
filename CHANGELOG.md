@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Multi-select rules in the Rules tab. Each rule row now has a small
+  selection checkbox at the far left (in the accent colour, scaled slightly
+  smaller than the enable / disable checkbox so the two are visually
+  distinct). Each group header has its own select-all checkbox with
+  tri-state (none / some / all selected) indicating how many of its rules
+  are picked. When any rule is selected, a bulk-action bar appears showing
+  the count plus **Clear selection** and **Delete selected** buttons. Bulk
+  delete asks for one confirmation, then issues one `deleteRule` mutation
+  per id. State is session-only; stale ids are pruned automatically if the
+  rule list changes underneath the user.
 - Collapse / expand groups, in both the DevTools panel's **Rules** tab and
   the toolbar **popup**:
   - A chevron on the left of each group header toggles just that group.
@@ -36,12 +46,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   row (`{ name: "", op: "set", value: "" }`) could previously survive into
   the persisted rule and cause `chrome.declarativeNetRequest` to silently
   reject the entire rule.
+- JSON import now silently drops header rows with an empty `name` instead of
+  rejecting the whole bundle. Old export files that pre-date the editor
+  strip-on-save fix can now be re-imported without manual JSON editing.
+- Import-conflict resolution per rule: when "Merge by id" is selected, any
+  incoming **rule** whose `id` already exists in the current state is flagged
+  with a `⚠ already exists` badge in the preview tree, with inline
+  **Overwrite** / **Rename as new** radios. Defaults to **Overwrite** (legacy
+  behaviour); selecting **Rename as new** keeps the existing rule and adds
+  the imported one with a fresh `id` and an auto-incremented name suffix
+  (`MyRule` → `MyRule (2)` → `MyRule (3)` …). **Groups** with a colliding
+  `id` are silently merged into the existing group — the user's group name,
+  enabled flag, and order are preserved, and imported rules just land inside
+  the existing group. Implemented in `applyImportWithResolutions` /
+  `detectConflicts` in `import-export.ts`.
 
 ### Changed
 
 - Master switch in the popup and DevTools panel is now a sliding pill toggle
   instead of a native checkbox. Behaviour identical (`checked` state still
   binds to `state.masterEnabled`); CSS-only via a new `.pm-toggle` class.
+- Per-group and per-rule **enable/disable** checkboxes in both the popup and
+  the DevTools panel's Rules tab are now compact toggle pills
+  (`.pm-toggle.pm-toggle-sm` — 26-28 px wide), so the visual language is
+  consistent across master, group and rule level. The bulk-select checkbox
+  in the Rules tab stays a standard square checkbox so it's visually
+  distinct from the enable toggles.
 - Upgraded React from 18.3 to 19.2, including `@types/react` and
   `@types/react-dom`. Added explicit `type JSX` imports across components
   (`panel.tsx`, `popup/main.tsx`, `RuleEditor`, `RulesTable`, `Capture`,
