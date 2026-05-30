@@ -167,7 +167,27 @@ registerLogPortListener();
 registerDnrMatchPortListener();
 registerDnrMatchListener();
 
-chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+// `sender.tab` is undefined when the message originates from an extension
+// context (DevTools panel, popup, options page, the service worker itself).
+// It's set when the sender is a content script in a tab — those are
+// untrusted (loaded on any http(s) origin) and must NOT be allowed to ask
+// the SW to mutate state or to touch cookies on a tab other than their own.
+export function isPrivilegedSender(sender: chrome.runtime.MessageSender): boolean {
+  return sender.tab === undefined;
+}
+
+// Cross-tab cookie access guard. A compromised page's content script could
+// otherwise call chrome.runtime.sendMessage with any tabId and ask us to
+// read/write httpOnly auth cookies on a totally unrelated tab.
+export function tabIdMatchesSender(
+  sender: chrome.runtime.MessageSender,
+  requestedTabId: number
+): boolean {
+  if (isPrivilegedSender(sender)) return true;
+  return sender.tab?.id === requestedTabId;
+}
+
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (!isRuntimeMessage(message)) return false;
 
   switch (message.type) {
@@ -178,6 +198,12 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       return true;
 
     case MESSAGE_TYPES.MUTATE_STATE:
+      // Only extension contexts (panel/popup) may mutate persisted state.
+      // A content script bridge could otherwise wholesale `replaceState`.
+      if (!isPrivilegedSender(sender)) {
+        sendResponse({ ok: false, error: 'MUTATE_STATE is restricted to extension contexts' });
+        return false;
+      }
       updateState((current) => applyMutation(current, message.mutation))
         .then((state) => sendResponse({ ok: true, state }))
         .catch((err: Error) => sendResponse({ ok: false, error: err.message }));
@@ -217,12 +243,20 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       return true;
 
     case MESSAGE_TYPES.COOKIES_GET:
+      if (!tabIdMatchesSender(sender, message.tabId)) {
+        sendResponse({ ok: false, error: 'tabId does not match sender tab' });
+        return false;
+      }
       getCookie(message.tabId, message.name, message.path)
         .then((cookie) => sendResponse({ ok: true, cookie }))
         .catch((err: Error) => sendResponse({ ok: false, error: err.message }));
       return true;
 
     case MESSAGE_TYPES.COOKIES_SET: {
+      if (!tabIdMatchesSender(sender, message.tabId)) {
+        sendResponse({ ok: false, error: 'tabId does not match sender tab' });
+        return false;
+      }
       // Build the setCookie arg with exact-optional-property semantics: only
       // include `path` when the caller actually provided one.
       const req = {
@@ -238,6 +272,10 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     }
 
     case MESSAGE_TYPES.COOKIES_REMOVE:
+      if (!tabIdMatchesSender(sender, message.tabId)) {
+        sendResponse({ ok: false, error: 'tabId does not match sender tab' });
+        return false;
+      }
       removeCookie(message.tabId, message.name, message.path)
         .then(() => sendResponse({ ok: true }))
         .catch((err: Error) => sendResponse({ ok: false, error: err.message }));
