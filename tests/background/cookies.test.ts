@@ -65,11 +65,11 @@ describe('cookies background', () => {
   describe('setCookie', () => {
     it('passes path explicitly so cookies land at the configured scope', async () => {
       tabsGet.mockResolvedValueOnce({ id: 1, url: 'https://example.com/anywhere' });
-      cookiesSet.mockResolvedValueOnce({ name: 'django_language', value: 'en' });
-      await setCookie({ tabId: 1, name: 'django_language', value: 'en', path: '/' });
+      cookiesSet.mockResolvedValueOnce({ name: 'app_locale', value: 'en' });
+      await setCookie({ tabId: 1, name: 'app_locale', value: 'en', path: '/' });
       expect(cookiesSet).toHaveBeenCalledWith({
         url: 'https://example.com/',
-        name: 'django_language',
+        name: 'app_locale',
         value: 'en',
         path: '/',
       });

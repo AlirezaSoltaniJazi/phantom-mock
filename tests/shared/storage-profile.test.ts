@@ -13,7 +13,7 @@ function makeProfile(overrides: Partial<StorageProfile> = {}): StorageProfile {
   return {
     id: 'sprof_a',
     name: 'Preferred locale',
-    key: 'HumaCraftStoreItem__preferredLocale',
+    key: 'localStorageKey',
     values: ['en_GB', 'de_DE'],
     enabled: true,
     ...overrides,

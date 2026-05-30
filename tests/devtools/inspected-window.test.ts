@@ -29,8 +29,8 @@ describe('inspected-window helpers', () => {
       received = expr;
       cb('en_GB', undefined);
     });
-    const result = await getLocalStorage('HumaCraftStoreItem__preferredLocale');
-    expect(received).toBe('window.localStorage.getItem("HumaCraftStoreItem__preferredLocale")');
+    const result = await getLocalStorage('localStorageKey');
+    expect(received).toBe('window.localStorage.getItem("localStorageKey")');
     expect(result).toBe('en_GB');
   });
 
@@ -40,10 +40,8 @@ describe('inspected-window helpers', () => {
       received = expr;
       cb(undefined, undefined);
     });
-    await setLocalStorage('HumaCraftStoreItem__preferredLocale', 'de_DE');
-    expect(received).toBe(
-      'void window.localStorage.setItem("HumaCraftStoreItem__preferredLocale", "de_DE")'
-    );
+    await setLocalStorage('localStorageKey', 'de_DE');
+    expect(received).toBe('void window.localStorage.setItem("localStorageKey", "de_DE")');
   });
 
   it('escapes embedded quotes and backslashes in keys and values', async () => {

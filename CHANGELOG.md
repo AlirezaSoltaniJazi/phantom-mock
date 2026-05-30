@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-05-30
+
+### Changed
+
+- Make data be more generic
+
 ## [0.5.0] - 2026-05-30
 
 ### Added
@@ -15,7 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   **Cookies Editor**) that mirror the Storage Profile UX for cookies on the
   inspected page. Define a profile once (label, cookie name, optional
   path, candidate values) and flip the cookie with a single chip click.
-  Common case: `django_language` between `en` / `de` / `fr` without
+  Common case: `app_locale` between `en` / `de` / `fr` without
   touching the Application panel. Backed by `chrome.cookies.get` /
   `chrome.cookies.set` / `chrome.cookies.remove` routed through the
   service worker, so **httpOnly cookies are fully supported** (sessionid,

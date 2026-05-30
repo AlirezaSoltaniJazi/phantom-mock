@@ -142,7 +142,7 @@ export interface SubdomainBucket<T> {
 
 /**
  * Within a single base-domain bucket, further group items by their subdomain
- * prefix (e.g. `kinexus.emea.validation` vs `kinexus.admin.emea.validation`).
+ * prefix (e.g. `api.staging.example` vs `admin.api.staging.example`).
  * Items pointed directly at the registrable domain land under `subdomain: null`.
  */
 export function bucketBySubdomain<T>(

@@ -37,7 +37,7 @@ of the inspected page after each switch.
 **Switch cookies (Cookies tab).** Same chip-selector UX for cookies,
 including `httpOnly` cookies that `document.cookie` can't touch. Defines a
 profile per cookie name + optional path, then flips with one click. Common
-case: `django_language` between `en` / `de` / `fr` without touching the
+case: `app_locale` between `en` / `de` / `fr` without touching the
 Application panel.
 
 **Organize and toggle.** Group rules, flip individual rules or whole groups

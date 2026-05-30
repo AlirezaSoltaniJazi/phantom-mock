@@ -90,7 +90,7 @@ export function CookiesEditor({ initial, onSave, onCancel, onDelete }: Props): J
         <input
           type="text"
           value={draft.cookieName}
-          placeholder="django_language"
+          placeholder="app_locale"
           onChange={(e) => setDraft({ ...draft, cookieName: e.target.value })}
           style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}
         />

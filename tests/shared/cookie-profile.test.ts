@@ -13,7 +13,7 @@ function makeProfile(overrides: Partial<CookieProfile> = {}): CookieProfile {
   return {
     id: 'cprof_a',
     name: 'Language',
-    cookieName: 'django_language',
+    cookieName: 'app_locale',
     values: ['en', 'de'],
     enabled: true,
     ...overrides,

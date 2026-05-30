@@ -78,7 +78,7 @@ export interface CookieProfile {
   id: string;
   // Human-friendly label shown in the panel (e.g. "Language").
   name: string;
-  // The actual cookie name written via chrome.cookies (e.g. "django_language").
+  // The actual cookie name written via chrome.cookies (e.g. "app_locale").
   cookieName: string;
   // Cookie path. Defaults to '/' at write time when missing.
   path?: string;

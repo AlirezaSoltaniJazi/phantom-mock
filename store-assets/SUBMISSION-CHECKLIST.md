@@ -32,7 +32,7 @@ For each permission, paste this into the dashboard "Permission justifications":
 - `declarativeNetRequest` — required to implement user-defined header overrides at the network layer.
 - `declarativeNetRequestFeedback` — required for debugging which DNR rules matched during development; needed for the "hit log" and "Debug" tabs in the DevTools panel.
 - `storage` — required to persist the user's rules, groups, storage profiles, and cookie profiles between sessions via `chrome.storage.local`.
-- `cookies` — required by the Cookies tab so the developer can read and overwrite a single cookie on the inspected tab (e.g. switch `django_language` between `en` / `de` while debugging). Used only in response to an explicit chip click in the panel — cookies are never read in the background and never leave the browser.
+- `cookies` — required by the Cookies tab so the developer can read and overwrite a single cookie on the inspected tab (e.g. switch `app_locale` between `en` / `de` while debugging). Used only in response to an explicit chip click in the panel — cookies are never read in the background and never leave the browser.
 - `<all_urls>` host permission — required because users may choose to mock requests, switch localStorage values, or overwrite cookies on any site they visit; the extension only acts on the tab the developer has open in DevTools and never exfiltrates page content.
 
 ## Single-purpose statement

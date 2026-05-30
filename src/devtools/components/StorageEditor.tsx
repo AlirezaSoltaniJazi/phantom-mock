@@ -83,7 +83,7 @@ export function StorageEditor({ initial, onSave, onCancel, onDelete }: Props): J
         <input
           type="text"
           value={draft.key}
-          placeholder="HumaCraftStoreItem__preferredLocale"
+          placeholder="localStorageKey"
           onChange={(e) => setDraft({ ...draft, key: e.target.value })}
           style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}
         />

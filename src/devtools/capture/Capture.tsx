@@ -105,7 +105,7 @@ export function Capture({
         <input
           className="pm-capture-filter"
           type="text"
-          placeholder="Host contains (e.g. freseniusmedicalcare.com) — empty = all hosts"
+          placeholder="Host contains (e.g. example.com) — empty = all hosts"
           value={hostFilter}
           onChange={(e) => setHostFilter(e.target.value)}
         />
