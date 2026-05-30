@@ -1,6 +1,6 @@
 {
   "name": "phantom-mock",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Chrome extension to mock REST API URLs and intercept HTTP requests right from your browser.",
   "license": "MIT",
   "private": true,
@@ -12,7 +12,9 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
+    "build:local": "tsc --noEmit && vite build --mode unpacked",
     "package": "npm run build && node scripts/zip-extension.mjs",
+    "package:local": "npm run build:local && node scripts/zip-extension.mjs --suffix=local",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "lint": "eslint src tests",

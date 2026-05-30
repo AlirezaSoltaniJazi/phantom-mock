@@ -7,6 +7,61 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-05-29
+
+### Added
+
+- `npm run build:local` and `npm run package:local` produce a side-by-side
+  unpacked build whose manifest name is **Phantom Mock - Local** (and whose
+  toolbar tooltip ends in `(Local)`). Loading `dist/` from a local checkout
+  no longer collides with the published Chrome Web Store extension in
+  `chrome://extensions` — both can be enabled at the same time. The
+  packaged zip is suffixed `phantom-mock-local-X.Y.Z.zip` so it can't
+  clobber the production artifact. Driven by Vite `--mode unpacked` (the
+  name `local` is reserved by Vite for `.env.local`); no duplicate
+  manifest file is maintained.
+- New **Debug** tab in the DevTools panel surfaces the live state of
+  `chrome.declarativeNetRequest`: currently-registered dynamic rules,
+  what the current app state translates to, the last sync error (if any),
+  and a **Test against URL** form that calls
+  `chrome.declarativeNetRequest.testMatchOutcome` so the user can ask
+  "would this URL match any of my header rules?" without re-loading a real
+  page. New `GET_DNR_DEBUG` and `TEST_DNR_MATCH` runtime messages route
+  through the service worker.
+- **Live DNR matches** feed in the Debug tab. Subscribes to
+  `chrome.declarativeNetRequest.onRuleMatchedDebug` (we already declare the
+  `declarativeNetRequestFeedback` permission) and shows every header-rule
+  fire in real time, with method, URL, rule name (resolved from the DNR
+  integer id back to the user's rule), and timestamp. Backed by a new
+  `src/background/dnr-match-log.ts` module mirroring the Hit Log's
+  port-based buffer pattern, plus `CLEAR_DNR_MATCH_LOG` runtime message.
+  Solves the "did my rule fire or not?" question that previously required
+  reading network curls. Capped at 200 entries.
+- **Header-rule scope warning** in the Rule Editor. When a header rule's
+  method is not `*` (e.g. POST-only), an inline warning under the Method
+  picker explains that redirected GETs and other verbs will NOT get the
+  header — with a one-click **Set to \*** button. Catches the most common
+  scoping mistake (login POST → 302 → GET to a redirect target that needs
+  the same header) at authoring time. Mock rules are unaffected.
+
+### Fixed
+
+- Header overwrite rules silently failed for some rule IDs.
+  `ruleIdFor()` in [`src/background/rules-dnr.ts`](src/background/rules-dnr.ts)
+  computed `hashStringToInt(rule.id) % 2_000_000_000`, which could land on
+  `0`. `chrome.declarativeNetRequest.updateDynamicRules` rejects IDs less
+  than 1 with `"id must be >= 1"` and discards the whole batch — so a
+  single unlucky rule made _every_ header rule disappear with no
+  user-visible signal. Now clamped to the range `1..1_999_999_999` (still
+  inside DNR's 32-bit signed-int ceiling). Unit-tested.
+- The service worker no longer swallows
+  `chrome.declarativeNetRequest.updateDynamicRules` failures. Each of the
+  three sync paths (`onInstalled`, `onStartup`, and the storage
+  `subscribe` callback) now routes through `syncDnrWithDiagnostics`,
+  which logs the failure with the offending translated rule JSON to the
+  service-worker console and stashes the message + payload so the new
+  Debug tab can show it.
+
 ## [0.2.0] - 2026-05-23
 
 ### Added
