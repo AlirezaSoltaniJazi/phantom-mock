@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { STORAGE_KEYS } from '@/shared/constants';
 import { newId } from '@/utils/id';
+import { reloadInspectedPage as sharedReloadInspectedPage } from '../inspected-window';
 import { matchesHostFilter, type CapturedEntry, type CapturedHeader } from './types';
 
 export interface UseCaptureOptions {
@@ -165,7 +166,7 @@ export function useCapture({ hostFilter, recording }: UseCaptureOptions): UseCap
   }, [hostFilter]);
 
   const reloadInspectedPage = useCallback(() => {
-    chrome.devtools?.inspectedWindow?.reload?.({ ignoreCache: false });
+    sharedReloadInspectedPage();
   }, []);
 
   return {

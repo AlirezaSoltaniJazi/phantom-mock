@@ -23,8 +23,16 @@ const RESOURCE_TYPES: chrome.declarativeNetRequest.ResourceType[] = [
   RT?.SUB_FRAME ?? ('sub_frame' as never),
 ];
 
-function ruleIdFor(rule: Rule): number {
-  return hashStringToInt(rule.id) % 2_000_000_000;
+/**
+ * DNR rule IDs must be positive integers (>= 1) and fit in a 32-bit signed
+ * int. If `hashStringToInt` happens to produce a value whose modulo lands on
+ * 0, `updateDynamicRules` rejects the whole batch with `"id must be >= 1"` —
+ * that is the most likely cause of header rules silently never landing.
+ * Clamp the floor to 1 and the ceiling under 2^31 - 1.
+ */
+export function ruleIdFor(rule: Rule): number {
+  const raw = hashStringToInt(rule.id) % 1_999_999_999; // → 0..1_999_999_998
+  return raw + 1; // → 1..1_999_999_999
 }
 
 function toDnrHeaders(ops: HeaderOp[]): DnrHeaderOp[] {
@@ -68,7 +76,9 @@ function buildCondition(rule: Rule): chrome.declarativeNetRequest.RuleCondition 
 }
 
 export function translateToDnrRules(state: AppState): DnrRule[] {
-  if (!state.masterEnabled) return [];
+  if (!state.masterEnabled) {
+    return [];
+  }
   const view = buildActiveView(state);
   const out: DnrRule[] = [];
   let priority = 1;

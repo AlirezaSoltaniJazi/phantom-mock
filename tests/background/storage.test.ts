@@ -30,6 +30,40 @@ describe('storage', () => {
     expect(fetched.masterEnabled).toBe(false);
   });
 
+  it('soft-migrates pre-0.4.0 state by defaulting storageProfiles to []', async () => {
+    // Pre-feature shape: AppState without `storageProfiles`. Must not be
+    // rejected — that would wipe the user's rules and groups.
+    const legacy = {
+      schemaVersion: 1,
+      masterEnabled: true,
+      groups: [{ id: 'default', name: 'Default', enabled: true, order: 0 }],
+      rules: [
+        {
+          id: 'rule_x',
+          name: 'r',
+          groupId: 'default',
+          enabled: true,
+          match: { method: 'GET', urlMatchType: 'contains', urlPattern: '/api' },
+          action: {
+            kind: 'mock',
+            statusCode: 200,
+            delayMs: 0,
+            responseBody: '{}',
+            responseContentType: 'application/json',
+            responseHeaders: [],
+            logToPanel: false,
+          },
+        },
+      ],
+      // no storageProfiles
+    };
+    get.mockResolvedValue({ [STORAGE_KEYS.APP_STATE]: legacy });
+    const state = await getState();
+    expect(state.rules.length).toBe(1);
+    expect(state.groups.length).toBe(1);
+    expect(state.storageProfiles).toEqual([]);
+  });
+
   it('updateState applies an updater function', async () => {
     const storage: Record<string, unknown> = {
       [STORAGE_KEYS.APP_STATE]: defaultState(),

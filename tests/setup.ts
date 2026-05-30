@@ -50,6 +50,13 @@ export function createChromeMock() {
       query: vi.fn().mockResolvedValue([]),
       sendMessage: vi.fn().mockResolvedValue(undefined),
       create: vi.fn().mockResolvedValue({}),
+      get: vi.fn().mockResolvedValue({ id: 1, url: 'https://example.com/' }),
+    },
+    cookies: {
+      get: vi.fn().mockResolvedValue(null),
+      set: vi.fn().mockResolvedValue(null),
+      remove: vi.fn().mockResolvedValue(null),
+      getAll: vi.fn().mockResolvedValue([]),
     },
     declarativeNetRequest: {
       updateDynamicRules: vi.fn().mockResolvedValue(undefined),
@@ -70,6 +77,15 @@ export function createChromeMock() {
     devtools: {
       panels: {
         create: vi.fn(),
+      },
+      inspectedWindow: {
+        eval: vi.fn(),
+        reload: vi.fn(),
+        tabId: 1 as number,
+      },
+      network: {
+        onRequestFinished: makeEvent<[chrome.devtools.network.Request]>(),
+        getHAR: vi.fn(),
       },
     },
     scripting: {

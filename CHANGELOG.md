@@ -7,6 +7,167 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-05-30
+
+### Added
+
+- **Cookie profiles** — a new pair of DevTools panel tabs (**Cookies** and
+  **Cookies Editor**) that mirror the Storage Profile UX for cookies on the
+  inspected page. Define a profile once (label, cookie name, optional
+  path, candidate values) and flip the cookie with a single chip click.
+  Common case: `django_language` between `en` / `de` / `fr` without
+  touching the Application panel. Backed by `chrome.cookies.get` /
+  `chrome.cookies.set` / `chrome.cookies.remove` routed through the
+  service worker, so **httpOnly cookies are fully supported** (sessionid,
+  csrftoken, etc.) — `document.cookie` from the page would have silently
+  failed on those.
+- Cookie profiles round-trip through **Settings → Export / Import** as a
+  separate "Cookie profiles" section in the selection tree, with the same
+  per-item conflict resolution (`Overwrite` / `Rename as new`) as rules
+  and storage profiles. Pre-0.5.0 export bundles without `cookieProfiles`
+  still import cleanly.
+- Optional **prefix / suffix** value wrapping (introduced for storage
+  profiles in 0.4.0) also applies to cookie profiles — useful when a
+  cookie holds e.g. URL-encoded or JSON-quoted content.
+
+### Changed
+
+- **New manifest permission**: `cookies`. Required to read/write `httpOnly`
+  cookies via `chrome.cookies.*`. Existing v0.4.0 users will see a
+  re-consent prompt on auto-update because of this permission addition;
+  the Chrome Web Store re-review for v0.5.0 will need a justification
+  noting that cookie reads/writes are scoped to the inspected tab's origin
+  and are user-initiated only.
+
+### Fixed
+
+- Path scope handled correctly for cookies set/read on non-root paths
+  (e.g. `/api/admin/`). Earlier draft passed the tab URL verbatim to
+  `chrome.cookies.get` / `.remove`, which silently missed cookies whose
+  path didn't fall under the tab's pathname. The URL is now rebuilt with
+  the profile's configured path before each call. Unit-tested.
+
+### Security
+
+- **Cross-tab cookie spoofing guard**. The service-worker `COOKIES_GET` /
+  `COOKIES_SET` / `COOKIES_REMOVE` handlers now require
+  `sender.tab?.id === message.tabId` whenever the sender is a content
+  script. Without this, a hypothetically-compromised content script could
+  have called `chrome.runtime.sendMessage` with an arbitrary `tabId` and
+  asked the SW to read or overwrite `httpOnly` auth cookies on a
+  completely unrelated tab. Privileged extension-context senders (the
+  DevTools panel, the popup) still accept any `tabId` since they know the
+  inspected tab via `chrome.devtools.inspectedWindow.tabId`. Defense in
+  depth — Chrome MV3 already restricts cross-extension messaging without
+  `externally_connectable`, but the guard removes one whole class of
+  threat from the model. Unit-tested.
+- **`MUTATE_STATE` restricted to extension contexts.** Content scripts
+  can no longer send a `replaceState` mutation to overwrite the user's
+  persisted rules, groups, and profiles wholesale.
+
+## [0.4.0] - 2026-05-30
+
+### Added
+
+- **Storage profiles** — a new pair of DevTools panel tabs (**Storage** and
+  **Storage Editor**) that let you flip values on the inspected page's
+  `localStorage` from a chip selector. Define a profile once (name, key,
+  list of candidate values like `en_GB` / `de_DE`); the Storage tab reads
+  the current value from the inspected page, shows it inline, and lets you
+  switch to any candidate with one click. New UI pref **Auto-reload after
+  switch** opts in to reloading the inspected page after each value
+  change; otherwise a manual **Reload page** button is provided. Driven by
+  `chrome.devtools.inspectedWindow.eval` from the panel — no service-worker
+  changes on the eval path; profiles persist in `chrome.storage.local`
+  with the same plumbing as rules.
+- `StorageProfile` is round-tripped through Export / Import — bundles
+  without a `storageProfiles` key (pre-0.4.0 exports) still import cleanly.
+- **Storage profiles in Settings → Export / Import.** The selection tree
+  in the Settings tab now lists storage profiles as a "Storage profiles"
+  section below the rule groups, with the same per-item checkbox UX,
+  Select-all behaviour, and conflict resolution (`Overwrite` /
+  `Rename as new`) as rules. Previously profiles were silently auto-included
+  in every export and import; now they're explicit.
+- **Value wrapping (prefix / suffix) in the Storage Editor.** Two
+  progressive-disclosure buttons — **+ Add prefix** and **+ Add suffix** —
+  reveal text inputs that wrap every value before it lands in
+  `localStorage`. Common case: `prefix = "` and `suffix = "` so JSON-quoted
+  values like `"en_GB"` are written correctly. The Storage tab chips now
+  display the **wrapped** value (what actually gets stored), and the
+  current-value `is-active` highlight compares against the wrapped form.
+  A live preview under the editor shows `prefix + <first value> + suffix`.
+
+### Fixed
+
+- Soft-migration for new `AppState` fields. The legacy `migrate()` path
+  used to call `defaultState()` on any schema mismatch, which would have
+  wiped every user's rules the next time the schema changed. Migration is
+  now additive — missing optional fields are normalised (e.g.
+  `storageProfiles` defaults to `[]`) and existing data is preserved.
+- Friendly empty-state on the Storage tab when the panel is opened as a
+  standalone extension page (`chrome-extension://…/panel.html`) instead of
+  inside DevTools. Previously the row showed the raw exception
+  `Cannot read properties of undefined (reading 'inspectedWindow')`; now
+  it shows a banner explaining that the feature needs the DevTools host
+  and points the user to **Right-click → Inspect → Phantom Mock**. Chips
+  and the reload / refresh buttons are disabled in this mode so they
+  can't trigger the same error.
+
+## [0.3.0] - 2026-05-29
+
+### Added
+
+- `npm run build:local` and `npm run package:local` produce a side-by-side
+  unpacked build whose manifest name is **Phantom Mock - Local** (and whose
+  toolbar tooltip ends in `(Local)`). Loading `dist/` from a local checkout
+  no longer collides with the published Chrome Web Store extension in
+  `chrome://extensions` — both can be enabled at the same time. The
+  packaged zip is suffixed `phantom-mock-local-X.Y.Z.zip` so it can't
+  clobber the production artifact. Driven by Vite `--mode unpacked` (the
+  name `local` is reserved by Vite for `.env.local`); no duplicate
+  manifest file is maintained.
+- New **Debug** tab in the DevTools panel surfaces the live state of
+  `chrome.declarativeNetRequest`: currently-registered dynamic rules,
+  what the current app state translates to, the last sync error (if any),
+  and a **Test against URL** form that calls
+  `chrome.declarativeNetRequest.testMatchOutcome` so the user can ask
+  "would this URL match any of my header rules?" without re-loading a real
+  page. New `GET_DNR_DEBUG` and `TEST_DNR_MATCH` runtime messages route
+  through the service worker.
+- **Live DNR matches** feed in the Debug tab. Subscribes to
+  `chrome.declarativeNetRequest.onRuleMatchedDebug` (we already declare the
+  `declarativeNetRequestFeedback` permission) and shows every header-rule
+  fire in real time, with method, URL, rule name (resolved from the DNR
+  integer id back to the user's rule), and timestamp. Backed by a new
+  `src/background/dnr-match-log.ts` module mirroring the Hit Log's
+  port-based buffer pattern, plus `CLEAR_DNR_MATCH_LOG` runtime message.
+  Solves the "did my rule fire or not?" question that previously required
+  reading network curls. Capped at 200 entries.
+- **Header-rule scope warning** in the Rule Editor. When a header rule's
+  method is not `*` (e.g. POST-only), an inline warning under the Method
+  picker explains that redirected GETs and other verbs will NOT get the
+  header — with a one-click **Set to \*** button. Catches the most common
+  scoping mistake (login POST → 302 → GET to a redirect target that needs
+  the same header) at authoring time. Mock rules are unaffected.
+
+### Fixed
+
+- Header overwrite rules silently failed for some rule IDs.
+  `ruleIdFor()` in [`src/background/rules-dnr.ts`](src/background/rules-dnr.ts)
+  computed `hashStringToInt(rule.id) % 2_000_000_000`, which could land on
+  `0`. `chrome.declarativeNetRequest.updateDynamicRules` rejects IDs less
+  than 1 with `"id must be >= 1"` and discards the whole batch — so a
+  single unlucky rule made _every_ header rule disappear with no
+  user-visible signal. Now clamped to the range `1..1_999_999_999` (still
+  inside DNR's 32-bit signed-int ceiling). Unit-tested.
+- The service worker no longer swallows
+  `chrome.declarativeNetRequest.updateDynamicRules` failures. Each of the
+  three sync paths (`onInstalled`, `onStartup`, and the storage
+  `subscribe` callback) now routes through `syncDnrWithDiagnostics`,
+  which logs the failure with the offending translated rule JSON to the
+  service-worker console and stashes the message + payload so the new
+  Debug tab can show it.
+
 ## [0.2.0] - 2026-05-23
 
 ### Added

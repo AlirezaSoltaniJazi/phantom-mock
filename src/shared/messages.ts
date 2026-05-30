@@ -8,8 +8,20 @@ export type StateMutation =
   | { kind: 'upsertRule'; rule: import('./types').Rule }
   | { kind: 'deleteRule'; ruleId: string }
   | { kind: 'toggleRule'; ruleId: string; enabled: boolean }
+  | { kind: 'upsertStorageProfile'; profile: import('./types').StorageProfile }
+  | { kind: 'deleteStorageProfile'; profileId: string }
+  | { kind: 'toggleStorageProfile'; profileId: string; enabled: boolean }
+  | { kind: 'upsertCookieProfile'; profile: import('./types').CookieProfile }
+  | { kind: 'deleteCookieProfile'; profileId: string }
+  | { kind: 'toggleCookieProfile'; profileId: string; enabled: boolean }
   | { kind: 'setMasterEnabled'; enabled: boolean }
   | { kind: 'replaceState'; state: AppState };
+
+export interface DnrTestRequest {
+  url: string;
+  method: string;
+  type: chrome.declarativeNetRequest.ResourceType;
+}
 
 export type RuntimeMessage =
   | { type: typeof MESSAGE_TYPES.GET_STATE }
@@ -17,7 +29,19 @@ export type RuntimeMessage =
   | { type: typeof MESSAGE_TYPES.RULES_UPDATED; state: AppState }
   | { type: typeof MESSAGE_TYPES.MOCK_HIT; hit: MockHit }
   | { type: typeof MESSAGE_TYPES.GET_HIT_LOG }
-  | { type: typeof MESSAGE_TYPES.CLEAR_HIT_LOG };
+  | { type: typeof MESSAGE_TYPES.CLEAR_HIT_LOG }
+  | { type: typeof MESSAGE_TYPES.GET_DNR_DEBUG }
+  | { type: typeof MESSAGE_TYPES.TEST_DNR_MATCH; request: DnrTestRequest }
+  | { type: typeof MESSAGE_TYPES.CLEAR_DNR_MATCH_LOG }
+  | { type: typeof MESSAGE_TYPES.COOKIES_GET; tabId: number; name: string; path?: string }
+  | {
+      type: typeof MESSAGE_TYPES.COOKIES_SET;
+      tabId: number;
+      name: string;
+      value: string;
+      path?: string;
+    }
+  | { type: typeof MESSAGE_TYPES.COOKIES_REMOVE; tabId: number; name: string; path?: string };
 
 export function isRuntimeMessage(value: unknown): value is RuntimeMessage {
   if (typeof value !== 'object' || value === null) return false;

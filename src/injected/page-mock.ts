@@ -37,6 +37,8 @@ function findMatch(url: string, method: string): Rule | undefined {
     masterEnabled: cache.masterEnabled,
     groups: cache.groups,
     rules: cache.rules,
+    storageProfiles: [],
+    cookieProfiles: [],
   };
   const view = buildActiveView(fakeState);
   for (const rule of cache.rules) {
@@ -309,6 +311,8 @@ function exposeDebugApi(): void {
         masterEnabled: cache.masterEnabled,
         groups: cache.groups,
         rules: cache.rules,
+        storageProfiles: [],
+        cookieProfiles: [],
       };
       const view = buildActiveView(fakeState);
       for (const rule of cache.rules) {

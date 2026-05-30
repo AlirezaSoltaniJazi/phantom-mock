@@ -17,11 +17,17 @@ if (!existsSync(distDir)) {
 const pkg = JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8'));
 const version = pkg.version;
 
+const suffixArg = process.argv.find((a) => a.startsWith('--suffix='));
+const suffix = suffixArg ? suffixArg.slice('--suffix='.length) : '';
+const nameParts = ['phantom-mock'];
+if (suffix) nameParts.push(suffix);
+nameParts.push(version);
+
 mkdirSync(releaseDir, { recursive: true });
 
 const zip = new AdmZip();
 zip.addLocalFolder(distDir);
 
-const outPath = resolve(releaseDir, `phantom-mock-${version}.zip`);
+const outPath = resolve(releaseDir, `${nameParts.join('-')}.zip`);
 zip.writeZip(outPath);
 console.log(`Wrote ${outPath}`);

@@ -61,6 +61,44 @@ export interface Group {
   order: number;
 }
 
+export interface StorageProfile {
+  id: string;
+  name: string;
+  key: string;
+  values: string[];
+  // Optional wrappers applied when SETTING a value: the actual string stored
+  // in localStorage is `prefix + value + suffix`. Useful for e.g. JSON quoting
+  // (prefix=`"`, suffix=`"`) or fragments like `{"locale":"…"}`.
+  prefix?: string;
+  suffix?: string;
+  enabled: boolean;
+}
+
+export interface CookieProfile {
+  id: string;
+  // Human-friendly label shown in the panel (e.g. "Language").
+  name: string;
+  // The actual cookie name written via chrome.cookies (e.g. "django_language").
+  cookieName: string;
+  // Cookie path. Defaults to '/' at write time when missing.
+  path?: string;
+  values: string[];
+  // Optional wrappers applied when SETTING a value: the stored cookie value is
+  // `prefix + value + suffix`. Mirrors StorageProfile prefix/suffix semantics.
+  prefix?: string;
+  suffix?: string;
+  enabled: boolean;
+}
+
+export interface DnrMatchEntry {
+  ts: number;
+  dnrRuleId: number;
+  ruleName: string | null;
+  ruleId: string | null;
+  url: string;
+  method: string;
+}
+
 export interface MockHit {
   ruleId: string;
   ruleName: string;
@@ -79,6 +117,8 @@ export interface AppState {
   masterEnabled: boolean;
   groups: Group[];
   rules: Rule[];
+  storageProfiles: StorageProfile[];
+  cookieProfiles: CookieProfile[];
 }
 
 export interface ExportBundle {
@@ -86,6 +126,8 @@ export interface ExportBundle {
   exportedAt: string;
   groups: Group[];
   rules: Rule[];
+  storageProfiles?: StorageProfile[];
+  cookieProfiles?: CookieProfile[];
 }
 
 export type ImportStrategy = 'replace' | 'merge-by-id' | 'append-as-new';
@@ -117,6 +159,7 @@ export interface UIPreferences {
   fontSizeCustomPx: number;
   showToast: boolean;
   captureColumns: Record<CaptureColumn, boolean>;
+  autoReloadOnStorageSwitch: boolean;
 }
 
 export const DEFAULT_CAPTURE_COLUMNS: Record<CaptureColumn, boolean> = {
@@ -133,6 +176,7 @@ export const DEFAULT_UI_PREFERENCES: UIPreferences = {
   fontSizeCustomPx: 14,
   showToast: true,
   captureColumns: { ...DEFAULT_CAPTURE_COLUMNS },
+  autoReloadOnStorageSwitch: false,
 };
 
 export const FONT_SIZE_PX: Record<Exclude<FontSizeMode, 'custom'>, number> = {

@@ -7,6 +7,8 @@ export function defaultState(): AppState {
     masterEnabled: true,
     groups: [{ id: DEFAULT_GROUP_ID, name: DEFAULT_GROUP_NAME, enabled: true, order: 0 }],
     rules: [],
+    storageProfiles: [],
+    cookieProfiles: [],
   };
 }
 
@@ -48,11 +50,26 @@ export function subscribe(listener: (next: AppState) => void): () => void {
   return () => chrome.storage.onChanged.removeListener(handler);
 }
 
+// Soft-migration: additive only. Each new field added to AppState must
+// normalize a missing/legacy value here (rather than the legacy `migrate`
+// path that wiped state on any schema-version mismatch). Keep CURRENT_SCHEMA_VERSION
+// stable for additive changes; bump only when an on-disk shape break is
+// genuinely required.
 function migrate(raw: AppState): AppState {
-  if (raw.schemaVersion === CURRENT_SCHEMA_VERSION) return raw;
-  return defaultState();
+  const next: AppState = {
+    schemaVersion: CURRENT_SCHEMA_VERSION,
+    masterEnabled: raw.masterEnabled,
+    groups: raw.groups,
+    rules: raw.rules,
+    storageProfiles: Array.isArray(raw.storageProfiles) ? raw.storageProfiles : [],
+    cookieProfiles: Array.isArray(raw.cookieProfiles) ? raw.cookieProfiles : [],
+  };
+  return next;
 }
 
+// `storageProfiles` and `cookieProfiles` are intentionally NOT validated here
+// — they're additive fields handled by `migrate` so pre-feature state still
+// loads cleanly.
 function isAppState(value: unknown): value is AppState {
   if (typeof value !== 'object' || value === null) return false;
   const v = value as Record<string, unknown>;
