@@ -27,7 +27,10 @@ export default defineConfig(({ mode }) => {
     build: {
       outDir: 'dist',
       emptyOutDir: true,
-      sourcemap: true,
+      // Sourcemaps only for the local/unpacked build — keeps the production
+      // CWS zip small (~80% of the bundle is .map files otherwise) and avoids
+      // shipping source structure to end users.
+      sourcemap: isLocal,
       rollupOptions: {
         input: {
           panel: 'src/devtools/panel.html',
