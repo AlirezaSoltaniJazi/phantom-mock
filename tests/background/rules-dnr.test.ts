@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { translateToDnrRules } from '@/background/rules-dnr';
+import { ruleIdFor, translateToDnrRules } from '@/background/rules-dnr';
 import { CURRENT_SCHEMA_VERSION, type AppState, type Rule } from '@/shared/types';
 import { DEFAULT_GROUP_ID } from '@/shared/constants';
 
@@ -69,6 +69,32 @@ describe('translateToDnrRules', () => {
       action: { kind: 'header', requestHeaders: [], responseHeaders: [] },
     });
     expect(translateToDnrRules(makeState([r]))).toEqual([]);
+  });
+
+  it('produces DNR IDs >= 1 for any rule id, including unlucky hashes', () => {
+    // DNR rejects rule IDs < 1 with "id must be >= 1" and discards the whole
+    // batch — the regression we are guarding against.
+    const samples = [
+      '',
+      'rule_a',
+      'rule_b',
+      'rule_c',
+      'rule_d',
+      'rule_e',
+      'rule_f',
+      'rule_g',
+      'rule_h',
+      'rule_i',
+      'rule_j',
+      'a-very-long-id-that-might-collide-on-modulo-0',
+    ];
+    for (const id of samples) {
+      const rule = makeHeaderRule({ id });
+      const dnrId = ruleIdFor(rule);
+      expect(dnrId).toBeGreaterThanOrEqual(1);
+      expect(dnrId).toBeLessThan(2_147_483_647);
+      expect(Number.isInteger(dnrId)).toBe(true);
+    }
   });
 
   it('skips mock rules entirely', () => {
