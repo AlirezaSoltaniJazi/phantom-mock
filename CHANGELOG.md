@@ -47,6 +47,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   path didn't fall under the tab's pathname. The URL is now rebuilt with
   the profile's configured path before each call. Unit-tested.
 
+### Security
+
+- **Cross-tab cookie spoofing guard**. The service-worker `COOKIES_GET` /
+  `COOKIES_SET` / `COOKIES_REMOVE` handlers now require
+  `sender.tab?.id === message.tabId` whenever the sender is a content
+  script. Without this, a hypothetically-compromised content script could
+  have called `chrome.runtime.sendMessage` with an arbitrary `tabId` and
+  asked the SW to read or overwrite `httpOnly` auth cookies on a
+  completely unrelated tab. Privileged extension-context senders (the
+  DevTools panel, the popup) still accept any `tabId` since they know the
+  inspected tab via `chrome.devtools.inspectedWindow.tabId`. Defense in
+  depth — Chrome MV3 already restricts cross-extension messaging without
+  `externally_connectable`, but the guard removes one whole class of
+  threat from the model. Unit-tested.
+- **`MUTATE_STATE` restricted to extension contexts.** Content scripts
+  can no longer send a `replaceState` mutation to overwrite the user's
+  persisted rules, groups, and profiles wholesale.
+
 ## [0.4.0] - 2026-05-30
 
 ### Added
