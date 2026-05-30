@@ -25,6 +25,7 @@ function makeState(rules: Rule[], masterEnabled = true): AppState {
     masterEnabled,
     groups: [{ id: DEFAULT_GROUP_ID, name: 'Default', enabled: true, order: 0 }],
     rules,
+    storageProfiles: [],
   };
 }
 
@@ -39,6 +40,7 @@ describe('translateToDnrRules', () => {
       masterEnabled: true,
       groups: [{ id: DEFAULT_GROUP_ID, name: 'Default', enabled: false, order: 0 }],
       rules: [makeHeaderRule()],
+      storageProfiles: [],
     };
     expect(translateToDnrRules(state)).toEqual([]);
   });

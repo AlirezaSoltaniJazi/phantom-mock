@@ -71,6 +71,15 @@ export function createChromeMock() {
       panels: {
         create: vi.fn(),
       },
+      inspectedWindow: {
+        eval: vi.fn(),
+        reload: vi.fn(),
+        tabId: 1 as number,
+      },
+      network: {
+        onRequestFinished: makeEvent<[chrome.devtools.network.Request]>(),
+        getHAR: vi.fn(),
+      },
     },
     scripting: {
       executeScript: vi.fn().mockResolvedValue([]),

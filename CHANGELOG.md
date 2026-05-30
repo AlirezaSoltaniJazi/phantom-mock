@@ -7,6 +7,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-05-30
+
+### Added
+
+- **Storage profiles** — a new pair of DevTools panel tabs (**Storage** and
+  **Storage Editor**) that let you flip values on the inspected page's
+  `localStorage` from a chip selector. Define a profile once (name, key,
+  list of candidate values like `en_GB` / `de_DE`); the Storage tab reads
+  the current value from the inspected page, shows it inline, and lets you
+  switch to any candidate with one click. New UI pref **Auto-reload after
+  switch** opts in to reloading the inspected page after each value
+  change; otherwise a manual **Reload page** button is provided. Driven by
+  `chrome.devtools.inspectedWindow.eval` from the panel — no service-worker
+  changes on the eval path; profiles persist in `chrome.storage.local`
+  with the same plumbing as rules.
+- `StorageProfile` is round-tripped through Export / Import — bundles
+  without a `storageProfiles` key (pre-0.4.0 exports) still import cleanly.
+- **Storage profiles in Settings → Export / Import.** The selection tree
+  in the Settings tab now lists storage profiles as a "Storage profiles"
+  section below the rule groups, with the same per-item checkbox UX,
+  Select-all behaviour, and conflict resolution (`Overwrite` /
+  `Rename as new`) as rules. Previously profiles were silently auto-included
+  in every export and import; now they're explicit.
+- **Value wrapping (prefix / suffix) in the Storage Editor.** Two
+  progressive-disclosure buttons — **+ Add prefix** and **+ Add suffix** —
+  reveal text inputs that wrap every value before it lands in
+  `localStorage`. Common case: `prefix = "` and `suffix = "` so JSON-quoted
+  values like `"en_GB"` are written correctly. The Storage tab chips now
+  display the **wrapped** value (what actually gets stored), and the
+  current-value `is-active` highlight compares against the wrapped form.
+  A live preview under the editor shows `prefix + <first value> + suffix`.
+
+### Fixed
+
+- Soft-migration for new `AppState` fields. The legacy `migrate()` path
+  used to call `defaultState()` on any schema mismatch, which would have
+  wiped every user's rules the next time the schema changed. Migration is
+  now additive — missing optional fields are normalised (e.g.
+  `storageProfiles` defaults to `[]`) and existing data is preserved.
+- Friendly empty-state on the Storage tab when the panel is opened as a
+  standalone extension page (`chrome-extension://…/panel.html`) instead of
+  inside DevTools. Previously the row showed the raw exception
+  `Cannot read properties of undefined (reading 'inspectedWindow')`; now
+  it shows a banner explaining that the feature needs the DevTools host
+  and points the user to **Right-click → Inspect → Phantom Mock**. Chips
+  and the reload / refresh buttons are disabled in this mode so they
+  can't trigger the same error.
+
 ## [0.3.0] - 2026-05-29
 
 ### Added
