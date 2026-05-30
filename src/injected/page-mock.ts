@@ -27,22 +27,17 @@ function onWindowMessage(event: MessageEvent): void {
   if (!data || data.source !== PAGE_MESSAGE_SOURCE) return;
   if (data.type === PAGE_MESSAGE_TYPES.RULES && data.payload) {
     cache = data.payload;
-    console.log(
-      `[pm-debug] page:rules master=${cache.masterEnabled} mockRules=${cache.rules.length}`
-    );
   }
 }
 
 function findMatch(url: string, method: string): Rule | undefined {
-  console.log(
-    `[pm-debug] page:findMatch url=${url} method=${method} master=${cache.masterEnabled} ruleCount=${cache.rules.length}`
-  );
   if (!cache.masterEnabled) return undefined;
   const fakeState: AppState = {
     schemaVersion: 1,
     masterEnabled: cache.masterEnabled,
     groups: cache.groups,
     rules: cache.rules,
+    storageProfiles: [],
   };
   const view = buildActiveView(fakeState);
   for (const rule of cache.rules) {
@@ -255,7 +250,6 @@ let originalFetchRef: typeof window.fetch | null = null;
 let patchedFetchRef: typeof window.fetch | null = null;
 
 export function install(): void {
-  console.log(`[pm-debug] page:install at ${location.href}`);
   if (installed) return;
   installed = true;
   originalFetchRef = window.fetch.bind(window);
@@ -316,6 +310,7 @@ function exposeDebugApi(): void {
         masterEnabled: cache.masterEnabled,
         groups: cache.groups,
         rules: cache.rules,
+        storageProfiles: [],
       };
       const view = buildActiveView(fakeState);
       for (const rule of cache.rules) {

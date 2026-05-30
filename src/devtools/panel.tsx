@@ -5,22 +5,33 @@ import { RulesTable } from './components/RulesTable';
 import { RuleEditor } from './components/RuleEditor';
 import { HitLog } from './components/HitLog';
 import { DnrDebug } from './components/DnrDebug';
+import { StorageTab } from './components/StorageTab';
+import { StorageEditor } from './components/StorageEditor';
 import { Settings } from './components/Settings';
 import { Capture } from './capture/Capture';
 import { useCapture } from './capture/use-capture';
-import type { Group, Rule } from '@/shared/types';
+import type { Group, Rule, StorageProfile } from '@/shared/types';
 import { STORAGE_KEYS } from '@/shared/constants';
 import { usePrefs, applyFontSizeVar } from '@/shared/use-prefs';
 import { newId } from '@/utils/id';
 import './styles.css';
 
-type Tab = 'rules' | 'editor' | 'hits' | 'debug' | 'capture' | 'settings';
+type Tab =
+  | 'rules'
+  | 'editor'
+  | 'storage'
+  | 'storage-editor'
+  | 'hits'
+  | 'debug'
+  | 'capture'
+  | 'settings';
 
 function App(): JSX.Element {
   const { state, error, mutate } = useAppState();
   const { prefs, setPrefs, fontSizePx } = usePrefs();
   const [tab, setTab] = useState<Tab>('rules');
   const [editing, setEditing] = useState<Rule | null>(null);
+  const [editingProfile, setEditingProfile] = useState<StorageProfile | null>(null);
   const [captureFilter, setCaptureFilter] = useState('');
   const [recording, setRecording] = useState(true);
   const capture = useCapture({ hostFilter: captureFilter, recording });
@@ -90,6 +101,23 @@ function App(): JSX.Element {
         </button>
         <button
           type="button"
+          className={`pm-tab ${tab === 'storage' ? 'is-active' : ''}`}
+          onClick={() => setTab('storage')}
+        >
+          Storage
+        </button>
+        <button
+          type="button"
+          className={`pm-tab ${tab === 'storage-editor' ? 'is-active' : ''}`}
+          onClick={() => {
+            setEditingProfile(null);
+            setTab('storage-editor');
+          }}
+        >
+          Storage Editor
+        </button>
+        <button
+          type="button"
           className={`pm-tab ${tab === 'hits' ? 'is-active' : ''}`}
           onClick={() => setTab('hits')}
         >
@@ -152,6 +180,49 @@ function App(): JSX.Element {
                   }
                 : undefined
             }
+          />
+        ) : null}
+        {tab === 'storage' ? (
+          <StorageTab
+            state={state}
+            mutate={mutate}
+            prefs={prefs}
+            setPrefs={setPrefs}
+            onEdit={(profile) => {
+              setEditingProfile(profile);
+              setTab('storage-editor');
+            }}
+            onNew={() => {
+              setEditingProfile(null);
+              setTab('storage-editor');
+            }}
+          />
+        ) : null}
+        {tab === 'storage-editor' ? (
+          <StorageEditor
+            key={editingProfile?.id ?? 'new'}
+            initial={editingProfile}
+            onSave={(profile) => {
+              void mutate({ kind: 'upsertStorageProfile', profile });
+              setEditingProfile(null);
+              setTab('storage');
+            }}
+            onCancel={() => {
+              setEditingProfile(null);
+              setTab('storage');
+            }}
+            {...(editingProfile
+              ? {
+                  onDelete: () => {
+                    void mutate({
+                      kind: 'deleteStorageProfile',
+                      profileId: editingProfile.id,
+                    });
+                    setEditingProfile(null);
+                    setTab('storage');
+                  },
+                }
+              : {})}
           />
         ) : null}
         {tab === 'hits' ? <HitLog /> : null}

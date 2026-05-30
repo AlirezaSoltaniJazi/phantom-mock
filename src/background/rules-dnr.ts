@@ -77,9 +77,6 @@ function buildCondition(rule: Rule): chrome.declarativeNetRequest.RuleCondition 
 
 export function translateToDnrRules(state: AppState): DnrRule[] {
   if (!state.masterEnabled) {
-    console.log(
-      `[pm-debug] dnr:translate master=false totalRules=${state.rules.length} headerOut=0`
-    );
     return [];
   }
   const view = buildActiveView(state);
@@ -104,20 +101,13 @@ export function translateToDnrRules(state: AppState): DnrRule[] {
       },
     });
   }
-  console.log(
-    `[pm-debug] dnr:translate master=${state.masterEnabled} totalRules=${state.rules.length} headerOut=${out.length}`
-  );
   return out;
 }
 
 export async function syncDnrRules(state: AppState): Promise<void> {
   const desired = translateToDnrRules(state);
   const existing = await chrome.declarativeNetRequest.getDynamicRules();
-  console.log(`[pm-debug] dnr:sync desired=${desired.length} existing=${existing.length}`);
   const removeRuleIds = existing.map((r) => r.id);
-  console.log(
-    `[pm-debug] dnr:update remove=${JSON.stringify(removeRuleIds)} add=${JSON.stringify(desired.map((d) => ({ id: d.id, cond: d.condition })))}`
-  );
   await chrome.declarativeNetRequest.updateDynamicRules({
     removeRuleIds,
     addRules: desired,

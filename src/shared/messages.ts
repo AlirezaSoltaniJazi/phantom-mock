@@ -8,6 +8,9 @@ export type StateMutation =
   | { kind: 'upsertRule'; rule: import('./types').Rule }
   | { kind: 'deleteRule'; ruleId: string }
   | { kind: 'toggleRule'; ruleId: string; enabled: boolean }
+  | { kind: 'upsertStorageProfile'; profile: import('./types').StorageProfile }
+  | { kind: 'deleteStorageProfile'; profileId: string }
+  | { kind: 'toggleStorageProfile'; profileId: string; enabled: boolean }
   | { kind: 'setMasterEnabled'; enabled: boolean }
   | { kind: 'replaceState'; state: AppState };
 

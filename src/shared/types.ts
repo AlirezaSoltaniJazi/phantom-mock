@@ -61,6 +61,19 @@ export interface Group {
   order: number;
 }
 
+export interface StorageProfile {
+  id: string;
+  name: string;
+  key: string;
+  values: string[];
+  // Optional wrappers applied when SETTING a value: the actual string stored
+  // in localStorage is `prefix + value + suffix`. Useful for e.g. JSON quoting
+  // (prefix=`"`, suffix=`"`) or fragments like `{"locale":"…"}`.
+  prefix?: string;
+  suffix?: string;
+  enabled: boolean;
+}
+
 export interface DnrMatchEntry {
   ts: number;
   dnrRuleId: number;
@@ -88,6 +101,7 @@ export interface AppState {
   masterEnabled: boolean;
   groups: Group[];
   rules: Rule[];
+  storageProfiles: StorageProfile[];
 }
 
 export interface ExportBundle {
@@ -95,6 +109,7 @@ export interface ExportBundle {
   exportedAt: string;
   groups: Group[];
   rules: Rule[];
+  storageProfiles?: StorageProfile[];
 }
 
 export type ImportStrategy = 'replace' | 'merge-by-id' | 'append-as-new';
@@ -126,6 +141,7 @@ export interface UIPreferences {
   fontSizeCustomPx: number;
   showToast: boolean;
   captureColumns: Record<CaptureColumn, boolean>;
+  autoReloadOnStorageSwitch: boolean;
 }
 
 export const DEFAULT_CAPTURE_COLUMNS: Record<CaptureColumn, boolean> = {
@@ -142,6 +158,7 @@ export const DEFAULT_UI_PREFERENCES: UIPreferences = {
   fontSizeCustomPx: 14,
   showToast: true,
   captureColumns: { ...DEFAULT_CAPTURE_COLUMNS },
+  autoReloadOnStorageSwitch: false,
 };
 
 export const FONT_SIZE_PX: Record<Exclude<FontSizeMode, 'custom'>, number> = {

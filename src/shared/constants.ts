@@ -34,6 +34,7 @@ export const DEFAULT_GROUP_ID = 'default';
 export const DEFAULT_GROUP_NAME = 'Default';
 
 export const MAX_RULES = 4000;
+export const MAX_STORAGE_PROFILES = 200;
 export const MAX_HIT_LOG_ENTRIES = 500;
 export const MAX_DNR_MATCH_ENTRIES = 200;
 export const MAX_DELAY_MS = 60_000;

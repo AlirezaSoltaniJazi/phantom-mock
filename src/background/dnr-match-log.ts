@@ -47,14 +47,8 @@ export function registerDnrMatchPortListener(): void {
 }
 
 export function registerDnrMatchListener(): void {
-  console.log(
-    `[pm-debug] dnrMatchListener:register available=${!!chrome.declarativeNetRequest?.onRuleMatchedDebug}`
-  );
   if (!chrome.declarativeNetRequest?.onRuleMatchedDebug) return;
   chrome.declarativeNetRequest.onRuleMatchedDebug.addListener((info) => {
-    console.log(
-      `[pm-debug] dnr:matched ruleId=${info.rule.ruleId} url=${info.request.url} method=${info.request.method} type=${info.request.type}`
-    );
     // Stamp the time the event fired, BEFORE awaiting state — otherwise
     // the timestamp drifts to reflect storage-read latency, not match time.
     const ts = Date.now();

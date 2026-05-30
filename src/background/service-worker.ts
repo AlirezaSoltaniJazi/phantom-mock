@@ -1,6 +1,6 @@
 import { MESSAGE_TYPES } from '@/shared/constants';
 import { isRuntimeMessage, type RuntimeMessage, type StateMutation } from '@/shared/messages';
-import { CURRENT_SCHEMA_VERSION, type AppState, type Group, type Rule } from '@/shared/types';
+import { CURRENT_SCHEMA_VERSION, type AppState } from '@/shared/types';
 import { defaultState, getState, setState, subscribe, updateState } from './storage';
 import { syncDnrRules, translateToDnrRules } from './rules-dnr';
 import { clearHits, getHits, recordHit, registerLogPortListener } from './log';
@@ -20,12 +20,8 @@ interface DnrSyncError {
 let lastDnrSyncError: DnrSyncError | null = null;
 
 async function syncDnrWithDiagnostics(state: AppState): Promise<void> {
-  console.log(
-    `[pm-debug] syncDnr:enter rules=${state.rules.length} headerRules=${state.rules.filter((r) => r.action.kind === 'header').length} master=${state.masterEnabled}`
-  );
   try {
     await syncDnrRules(state);
-    console.log('[pm-debug] syncDnr:ok');
     lastDnrSyncError = null;
   } catch (err) {
     const translated = translateToDnrRules(state);
@@ -34,7 +30,6 @@ async function syncDnrWithDiagnostics(state: AppState): Promise<void> {
       translatedJson: JSON.stringify(translated, null, 2),
       ts: Date.now(),
     };
-    console.warn('[pm-debug] syncDnr:FAIL', (err as Error).message);
     console.error(
       '[phantom-mock] declarativeNetRequest.updateDynamicRules failed',
       err,
@@ -80,12 +75,26 @@ function applyMutation(state: AppState, mutation: StateMutation): AppState {
       );
       return { ...state, rules };
     }
+    case 'upsertStorageProfile': {
+      const storageProfiles = upsertById(state.storageProfiles, mutation.profile);
+      return { ...state, storageProfiles };
+    }
+    case 'deleteStorageProfile': {
+      const storageProfiles = state.storageProfiles.filter((p) => p.id !== mutation.profileId);
+      return { ...state, storageProfiles };
+    }
+    case 'toggleStorageProfile': {
+      const storageProfiles = state.storageProfiles.map((p) =>
+        p.id === mutation.profileId ? { ...p, enabled: mutation.enabled } : p
+      );
+      return { ...state, storageProfiles };
+    }
     case 'replaceState':
       return { ...mutation.state, schemaVersion: CURRENT_SCHEMA_VERSION };
   }
 }
 
-function upsertById<T extends Rule | Group>(items: T[], next: T): T[] {
+function upsertById<T extends { id: string }>(items: T[], next: T): T[] {
   const idx = items.findIndex((i) => i.id === next.id);
   if (idx === -1) return [...items, next];
   const copy = items.slice();
@@ -110,12 +119,10 @@ function canReceiveContentScriptMessage(tab: chrome.tabs.Tab): tab is chrome.tab
 }
 
 async function broadcastRulesUpdated(state: AppState): Promise<void> {
-  console.log('[pm-debug] broadcast:enter');
   const message: RuntimeMessage = { type: MESSAGE_TYPES.RULES_UPDATED, state };
   try {
     const tabs = await chrome.tabs.query({ url: ['http://*/*', 'https://*/*', 'file:///*'] });
     const targets = tabs.filter(canReceiveContentScriptMessage);
-    console.log(`[pm-debug] broadcast:done tabs=${targets.length}`);
     await Promise.all(
       targets.map((tab) => chrome.tabs.sendMessage(tab.id, message).catch(() => undefined))
     );
@@ -126,7 +133,6 @@ async function broadcastRulesUpdated(state: AppState): Promise<void> {
 
 chrome.runtime.onInstalled.addListener(async () => {
   const current = await getState().catch(() => null);
-  console.log(`[pm-debug] onInstalled current=${!!current}`);
   if (!current) {
     await setState(defaultState());
   }
@@ -134,12 +140,10 @@ chrome.runtime.onInstalled.addListener(async () => {
 });
 
 chrome.runtime.onStartup.addListener(async () => {
-  console.log('[pm-debug] onStartup');
   await syncDnrWithDiagnostics(await getState());
 });
 
 subscribe(async (next) => {
-  console.log(`[pm-debug] subscribe:fire rules=${next.rules.length} master=${next.masterEnabled}`);
   await syncDnrWithDiagnostics(next);
   await broadcastRulesUpdated(next);
 });
@@ -153,14 +157,12 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 
   switch (message.type) {
     case MESSAGE_TYPES.GET_STATE:
-      console.log(`[pm-debug] msg:GET_STATE from=${_sender.tab?.id ?? 'ext'}`);
       getState()
         .then((state) => sendResponse({ ok: true, state }))
         .catch((err: Error) => sendResponse({ ok: false, error: err.message }));
       return true;
 
     case MESSAGE_TYPES.MUTATE_STATE:
-      console.log(`[pm-debug] msg:MUTATE_STATE kind=${message.mutation.kind}`);
       updateState((current) => applyMutation(current, message.mutation))
         .then((state) => sendResponse({ ok: true, state }))
         .catch((err: Error) => sendResponse({ ok: false, error: err.message }));
@@ -186,13 +188,9 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       return false;
 
     case MESSAGE_TYPES.GET_DNR_DEBUG:
-      console.log('[pm-debug] msg:GET_DNR_DEBUG');
       Promise.all([getState(), chrome.declarativeNetRequest.getDynamicRules()])
         .then(([state, registered]) => {
           const translated = translateToDnrRules(state);
-          console.log(
-            `[pm-debug] dnrDebug registered=${registered.length} translated=${translated.length}`
-          );
           sendResponse({
             ok: true,
             registered,
@@ -205,7 +203,6 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 
     case MESSAGE_TYPES.TEST_DNR_MATCH: {
       const { url, method, type } = message.request;
-      console.log(`[pm-debug] msg:TEST_DNR_MATCH url=${url} method=${method} type=${type}`);
       // chrome.declarativeNetRequest.testMatchOutcome is the canonical
       // "would this URL match any of my rules?" probe.
       const api = chrome.declarativeNetRequest as typeof chrome.declarativeNetRequest & {
@@ -220,7 +217,6 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       }
       api.testMatchOutcome({ url, method: method.toLowerCase(), type }, (result) => {
         const err = chrome.runtime.lastError;
-        console.log(`[pm-debug] testMatch result matched=${result.matchedRules.length}`);
         if (err) sendResponse({ ok: false, error: err.message });
         else sendResponse({ ok: true, matchedRules: result.matchedRules });
       });

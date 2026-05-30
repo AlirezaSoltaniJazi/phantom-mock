@@ -19,6 +19,7 @@ import {
   type Group,
   type ImportStrategy,
   type Rule,
+  type StorageProfile,
   type UIPreferences,
 } from '@/shared/types';
 import type { StateMutation } from '@/shared/messages';
@@ -112,17 +113,22 @@ function Notifications({
   );
 }
 
+type ExportSelectionState = {
+  groups: Set<string>;
+  rules: Set<string>;
+  storageProfiles: Set<string>;
+};
+
 function ExportPanel({ state }: { state: AppState }): JSX.Element {
-  const [selection, setSelection] = useState<{
-    groups: Set<string>;
-    rules: Set<string>;
-  }>(() => allSelected(state));
+  const [selection, setSelection] = useState<ExportSelectionState>(() => allSelected(state));
   const [error, setError] = useState<string | null>(null);
 
   function toggleAll(): void {
-    const allRules = state.rules.length === selection.rules.size;
-    if (allRules) {
-      setSelection({ groups: new Set(), rules: new Set() });
+    const everythingOn =
+      selection.rules.size === state.rules.length &&
+      selection.storageProfiles.size === state.storageProfiles.length;
+    if (everythingOn) {
+      setSelection({ groups: new Set(), rules: new Set(), storageProfiles: new Set() });
     } else {
       setSelection(allSelected(state));
     }
@@ -140,7 +146,7 @@ function ExportPanel({ state }: { state: AppState }): JSX.Element {
       for (const id of rulesInGroup) nextRules.add(id);
       nextGroups.add(g.id);
     }
-    setSelection({ groups: nextGroups, rules: nextRules });
+    setSelection({ ...selection, groups: nextGroups, rules: nextRules });
   }
 
   function toggleRule(r: Rule): void {
@@ -150,15 +156,35 @@ function ExportPanel({ state }: { state: AppState }): JSX.Element {
     setSelection({ ...selection, rules: nextRules });
   }
 
+  function toggleProfile(p: StorageProfile): void {
+    const next = new Set(selection.storageProfiles);
+    if (next.has(p.id)) next.delete(p.id);
+    else next.add(p.id);
+    setSelection({ ...selection, storageProfiles: next });
+  }
+
+  function toggleAllProfiles(): void {
+    const allOn = selection.storageProfiles.size === state.storageProfiles.length;
+    setSelection({
+      ...selection,
+      storageProfiles: allOn ? new Set() : new Set(state.storageProfiles.map((p) => p.id)),
+    });
+  }
+
   function downloadSelection(): void {
-    if (selection.rules.size === 0 && selection.groups.size === 0) {
-      setError('Select at least one rule or group to export.');
+    if (
+      selection.rules.size === 0 &&
+      selection.groups.size === 0 &&
+      selection.storageProfiles.size === 0
+    ) {
+      setError('Select at least one rule, group, or storage profile to export.');
       return;
     }
     setError(null);
     const bundle = buildSelectiveExportBundle(state, {
       groupIds: selection.groups,
       ruleIds: selection.rules,
+      storageProfileIds: selection.storageProfiles,
     });
     const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
     const blob = new Blob([JSON.stringify(bundle, null, 2)], {
@@ -173,17 +199,23 @@ function ExportPanel({ state }: { state: AppState }): JSX.Element {
   }
 
   const totalRules = state.rules.length;
-  const selectedCount = selection.rules.size;
+  const totalProfiles = state.storageProfiles.length;
+  const selectedRules = selection.rules.size;
+  const selectedProfiles = selection.storageProfiles.size;
+  const everythingOn = selectedRules === totalRules && selectedProfiles === totalProfiles;
 
   return (
     <fieldset className="pm-fieldset">
       <legend>Export</legend>
       <div className="pm-toolbar pm-toolbar-tight">
         <button type="button" className="pm-btn secondary" onClick={toggleAll}>
-          {selectedCount === totalRules ? 'Deselect all' : 'Select all'}
+          {everythingOn ? 'Deselect all' : 'Select all'}
         </button>
         <span style={{ color: 'var(--fg-muted)' }}>
-          {selectedCount} of {totalRules} rule{totalRules === 1 ? '' : 's'} selected
+          {selectedRules}/{totalRules} rule{totalRules === 1 ? '' : 's'}
+          {totalProfiles > 0
+            ? ` · ${selectedProfiles}/${totalProfiles} profile${totalProfiles === 1 ? '' : 's'}`
+            : ''}
         </span>
         <div style={{ flex: 1 }} />
         <button type="button" className="pm-btn" onClick={downloadSelection}>
@@ -195,6 +227,8 @@ function ExportPanel({ state }: { state: AppState }): JSX.Element {
         selection={selection}
         onToggleGroup={toggleGroup}
         onToggleRule={toggleRule}
+        onToggleProfile={toggleProfile}
+        onToggleAllProfiles={toggleAllProfiles}
       />
       {error ? <div className="pm-error">{error}</div> : null}
     </fieldset>
@@ -210,14 +244,12 @@ function ImportPanel({
 }): JSX.Element {
   const [strategy, setStrategy] = useState<ImportStrategy>('merge-by-id');
   const [bundle, setBundle] = useState<ExportBundle | null>(null);
-  const [selection, setSelection] = useState<{
-    groups: Set<string>;
-    rules: Set<string>;
-  } | null>(null);
+  const [selection, setSelection] = useState<ExportSelectionState | null>(null);
   const [conflicts, setConflicts] = useState<ImportConflicts | null>(null);
   const [resolutions, setResolutions] = useState<ImportResolutions>(() => ({
     rules: new Map(),
     groups: new Map(),
+    storageProfiles: new Map(),
   }));
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
@@ -239,6 +271,7 @@ function ImportPanel({
     setSelection({
       groups: new Set(parsed.value.groups.map((g) => g.id)),
       rules: new Set(parsed.value.rules.map((r) => r.id)),
+      storageProfiles: new Set((parsed.value.storageProfiles ?? []).map((p) => p.id)),
     });
     const conf = detectConflicts(state, parsed.value);
     setConflicts(conf);
@@ -247,11 +280,19 @@ function ImportPanel({
     setResolutions({
       rules: new Map([...conf.ruleIds].map((id) => [id, 'overwrite' as const])),
       groups: new Map([...conf.groupIds].map((id) => [id, 'overwrite' as const])),
+      storageProfiles: new Map([...conf.storageProfileIds].map((id) => [id, 'overwrite' as const])),
     });
   }
 
   function setRuleResolution(ruleId: string, res: ConflictResolution): void {
     setResolutions((prev) => ({ ...prev, rules: new Map(prev.rules).set(ruleId, res) }));
+  }
+
+  function setProfileResolution(profileId: string, res: ConflictResolution): void {
+    setResolutions((prev) => ({
+      ...prev,
+      storageProfiles: new Map(prev.storageProfiles).set(profileId, res),
+    }));
   }
 
   function toggleGroup(g: Group): void {
@@ -267,7 +308,7 @@ function ImportPanel({
       for (const id of inGroup) nextRules.add(id);
       nextGroups.add(g.id);
     }
-    setSelection({ groups: nextGroups, rules: nextRules });
+    setSelection({ ...selection, groups: nextGroups, rules: nextRules });
   }
 
   function toggleRule(r: Rule): void {
@@ -278,14 +319,37 @@ function ImportPanel({
     setSelection({ ...selection, rules: next });
   }
 
+  function toggleProfile(p: StorageProfile): void {
+    if (!selection) return;
+    const next = new Set(selection.storageProfiles);
+    if (next.has(p.id)) next.delete(p.id);
+    else next.add(p.id);
+    setSelection({ ...selection, storageProfiles: next });
+  }
+
+  function toggleAllProfiles(): void {
+    if (!selection || !bundle) return;
+    const profiles = bundle.storageProfiles ?? [];
+    const allOn = selection.storageProfiles.size === profiles.length;
+    setSelection({
+      ...selection,
+      storageProfiles: allOn ? new Set() : new Set(profiles.map((p) => p.id)),
+    });
+  }
+
   async function performImport(): Promise<void> {
     if (!bundle || !selection) return;
     const filtered = filterBundle(bundle, {
       groupIds: selection.groups,
       ruleIds: selection.rules,
+      storageProfileIds: selection.storageProfiles,
     });
-    if (filtered.rules.length === 0 && filtered.groups.length === 0) {
-      setError('Select at least one rule or group to import.');
+    if (
+      filtered.rules.length === 0 &&
+      filtered.groups.length === 0 &&
+      (filtered.storageProfiles?.length ?? 0) === 0
+    ) {
+      setError('Select at least one rule, group, or storage profile to import.');
       return;
     }
     const next =
@@ -293,17 +357,22 @@ function ImportPanel({
         ? applyImportWithResolutions(state, filtered, resolutions)
         : applyImport(state, filtered, strategy);
     await mutate({ kind: 'replaceState', state: next });
-    const renames = [...resolutions.rules.values()].filter((r) => r === 'rename').length;
+    const renamedRules = [...resolutions.rules.values()].filter((r) => r === 'rename').length;
+    const renamedProfiles = [...resolutions.storageProfiles.values()].filter(
+      (r) => r === 'rename'
+    ).length;
+    const renameTotal = renamedRules + renamedProfiles;
+    const profileCount = filtered.storageProfiles?.length ?? 0;
     setInfo(
-      `Imported ${filtered.rules.length} rule(s) and ${filtered.groups.length} group(s)` +
-        (strategy === 'merge-by-id' && renames > 0
-          ? ` (${renames} renamed to avoid id conflict).`
+      `Imported ${filtered.rules.length} rule(s), ${filtered.groups.length} group(s), and ${profileCount} storage profile(s)` +
+        (strategy === 'merge-by-id' && renameTotal > 0
+          ? ` (${renameTotal} renamed to avoid id conflict).`
           : '.')
     );
     setBundle(null);
     setSelection(null);
     setConflicts(null);
-    setResolutions({ rules: new Map(), groups: new Map() });
+    setResolutions({ rules: new Map(), groups: new Map(), storageProfiles: new Map() });
     if (fileRef.current) fileRef.current.value = '';
   }
 
@@ -314,6 +383,7 @@ function ImportPanel({
       masterEnabled: state.masterEnabled,
       groups: bundle.groups,
       rules: bundle.rules,
+      storageProfiles: bundle.storageProfiles ?? [],
     };
   }, [bundle, state.masterEnabled]);
 
@@ -344,7 +414,11 @@ function ImportPanel({
         <>
           <div className="pm-toolbar pm-toolbar-tight">
             <span style={{ color: 'var(--fg-muted)' }}>
-              {selection.rules.size} of {bundle?.rules.length ?? 0} rule(s) selected
+              {selection.rules.size}/{bundle?.rules.length ?? 0} rule
+              {(bundle?.rules.length ?? 0) === 1 ? '' : 's'}
+              {(bundle?.storageProfiles?.length ?? 0) > 0
+                ? ` · ${selection.storageProfiles.size}/${bundle?.storageProfiles?.length ?? 0} profile${(bundle?.storageProfiles?.length ?? 0) === 1 ? '' : 's'}`
+                : ''}
             </span>
             <div style={{ flex: 1 }} />
             <button type="button" className="pm-btn" onClick={() => void performImport()}>
@@ -356,9 +430,12 @@ function ImportPanel({
             selection={selection}
             onToggleGroup={toggleGroup}
             onToggleRule={toggleRule}
+            onToggleProfile={toggleProfile}
+            onToggleAllProfiles={toggleAllProfiles}
             conflicts={strategy === 'merge-by-id' ? conflicts : null}
             resolutions={resolutions}
             onSetRuleResolution={setRuleResolution}
+            onSetProfileResolution={setProfileResolution}
           />
         </>
       ) : null}
@@ -370,12 +447,15 @@ function ImportPanel({
 
 interface SelectionTreeProps {
   state: AppState;
-  selection: { groups: Set<string>; rules: Set<string> };
+  selection: ExportSelectionState;
   onToggleGroup: (g: Group) => void;
   onToggleRule: (r: Rule) => void;
+  onToggleProfile: (p: StorageProfile) => void;
+  onToggleAllProfiles: () => void;
   conflicts?: ImportConflicts | null;
   resolutions?: ImportResolutions;
   onSetRuleResolution?: (ruleId: string, res: ConflictResolution) => void;
+  onSetProfileResolution?: (profileId: string, res: ConflictResolution) => void;
 }
 
 function SelectionTree({
@@ -383,11 +463,17 @@ function SelectionTree({
   selection,
   onToggleGroup,
   onToggleRule,
+  onToggleProfile,
+  onToggleAllProfiles,
   conflicts,
   resolutions,
   onSetRuleResolution,
+  onSetProfileResolution,
 }: SelectionTreeProps): JSX.Element {
   const groups = [...state.groups].sort((a, b) => a.order - b.order);
+  const profiles = state.storageProfiles;
+  const allProfilesOn =
+    profiles.length > 0 && profiles.every((p) => selection.storageProfiles.has(p.id));
   return (
     <div className="pm-selection-tree">
       {groups.map((g) => {
@@ -464,6 +550,60 @@ function SelectionTree({
           </div>
         );
       })}
+
+      {profiles.length > 0 ? (
+        <div className="pm-selection-group">
+          <label className="pm-checkbox">
+            <input
+              type="checkbox"
+              checked={allProfilesOn}
+              ref={(el) => {
+                if (!el) return;
+                el.indeterminate =
+                  !allProfilesOn && profiles.some((p) => selection.storageProfiles.has(p.id));
+              }}
+              onChange={onToggleAllProfiles}
+            />
+            <strong>Storage profiles</strong>
+            <span style={{ color: 'var(--fg-muted)' }}> · {profiles.length}</span>
+          </label>
+          <div style={{ paddingLeft: 24 }}>
+            {profiles.map((p) => {
+              const profileConflict = conflicts?.storageProfileIds.has(p.id) ?? false;
+              const profileResolution = resolutions?.storageProfiles.get(p.id);
+              return (
+                <div key={p.id} className="pm-selection-rule-wrap">
+                  <label className="pm-checkbox" style={{ display: 'flex' }}>
+                    <input
+                      type="checkbox"
+                      checked={selection.storageProfiles.has(p.id)}
+                      onChange={() => onToggleProfile(p)}
+                    />
+                    <span className="pm-badge header">STORAGE</span>
+                    <span style={{ marginLeft: 6, flex: 1 }} title={p.key}>
+                      <strong>{p.name || '(unnamed)'}</strong>
+                      <br />
+                      <small style={{ color: 'var(--fg-muted)' }}>
+                        {p.key} · {p.values.length} value{p.values.length === 1 ? '' : 's'}
+                      </small>
+                    </span>
+                  </label>
+                  {profileConflict && onSetProfileResolution ? (
+                    <div className="pm-conflict-row">
+                      <span className="pm-conflict-badge">⚠ already exists</span>
+                      <ConflictRadio
+                        name={`sprof-${p.id}`}
+                        resolution={profileResolution}
+                        onChange={(res) => onSetProfileResolution(p.id, res)}
+                      />
+                    </div>
+                  ) : null}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -502,9 +642,10 @@ function ConflictRadio({
   );
 }
 
-function allSelected(state: AppState): { groups: Set<string>; rules: Set<string> } {
+function allSelected(state: AppState): ExportSelectionState {
   return {
     groups: new Set(state.groups.map((g) => g.id)),
     rules: new Set(state.rules.map((r) => r.id)),
+    storageProfiles: new Set(state.storageProfiles.map((p) => p.id)),
   };
 }

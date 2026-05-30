@@ -12,9 +12,6 @@ import { showRuleAppliedToast } from './toast';
 
 function postRulesToPage(state: AppState): void {
   const mockRules = state.rules.filter((r): r is Rule => r.action.kind === 'mock');
-  console.log(
-    `[pm-debug] content:postRules mockRules=${mockRules.length} master=${state.masterEnabled}`
-  );
   window.postMessage(
     {
       source: PAGE_MESSAGE_SOURCE,
@@ -32,7 +29,6 @@ function postRulesToPage(state: AppState): void {
 async function pullStateAndSeed(): Promise<void> {
   try {
     const response = await chrome.runtime.sendMessage({ type: MESSAGE_TYPES.GET_STATE });
-    console.log(`[pm-debug] content:GET_STATE response=${!!response}`);
     if (response && typeof response === 'object' && 'state' in response) {
       postRulesToPage((response as { state: AppState }).state);
     }
@@ -55,7 +51,6 @@ window.addEventListener('message', (event: MessageEvent) => {
   if (!data || data.source !== PAGE_MESSAGE_SOURCE) return;
   if (data.type === PAGE_MESSAGE_TYPES.HIT) {
     const hit = data.payload as MockHit;
-    console.log(`[pm-debug] content:send MOCK_HIT rule=${hit.ruleName}`);
     chrome.runtime.sendMessage({ type: MESSAGE_TYPES.MOCK_HIT, hit }).catch(() => {
       // service worker may have torn down; nothing actionable here
     });
@@ -71,7 +66,6 @@ window.addEventListener('message', (event: MessageEvent) => {
 
 chrome.runtime.onMessage.addListener((message: unknown) => {
   if (!isRuntimeMessage(message)) return undefined;
-  console.log(`[pm-debug] content:recv ${message.type}`);
   if (message.type === MESSAGE_TYPES.RULES_UPDATED) {
     postRulesToPage(message.state);
   }

@@ -43,7 +43,17 @@ function sanitize(value: unknown): UIPreferences {
   const showToast =
     typeof v.showToast === 'boolean' ? v.showToast : DEFAULT_UI_PREFERENCES.showToast;
   const captureColumns = sanitizeColumns(v.captureColumns);
-  return { fontSizeMode, fontSizeCustomPx, showToast, captureColumns };
+  const autoReloadOnStorageSwitch =
+    typeof v.autoReloadOnStorageSwitch === 'boolean'
+      ? v.autoReloadOnStorageSwitch
+      : DEFAULT_UI_PREFERENCES.autoReloadOnStorageSwitch;
+  return {
+    fontSizeMode,
+    fontSizeCustomPx,
+    showToast,
+    captureColumns,
+    autoReloadOnStorageSwitch,
+  };
 }
 
 export async function getPrefs(): Promise<UIPreferences> {
