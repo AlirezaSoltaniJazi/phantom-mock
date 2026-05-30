@@ -4,6 +4,7 @@ import { useAppState } from './state-hook';
 import { RulesTable } from './components/RulesTable';
 import { RuleEditor } from './components/RuleEditor';
 import { HitLog } from './components/HitLog';
+import { DnrDebug } from './components/DnrDebug';
 import { Settings } from './components/Settings';
 import { Capture } from './capture/Capture';
 import { useCapture } from './capture/use-capture';
@@ -13,7 +14,7 @@ import { usePrefs, applyFontSizeVar } from '@/shared/use-prefs';
 import { newId } from '@/utils/id';
 import './styles.css';
 
-type Tab = 'rules' | 'editor' | 'hits' | 'capture' | 'settings';
+type Tab = 'rules' | 'editor' | 'hits' | 'debug' | 'capture' | 'settings';
 
 function App(): JSX.Element {
   const { state, error, mutate } = useAppState();
@@ -96,6 +97,13 @@ function App(): JSX.Element {
         </button>
         <button
           type="button"
+          className={`pm-tab ${tab === 'debug' ? 'is-active' : ''}`}
+          onClick={() => setTab('debug')}
+        >
+          Debug
+        </button>
+        <button
+          type="button"
           className={`pm-tab ${tab === 'capture' ? 'is-active' : ''}`}
           onClick={() => setTab('capture')}
         >
@@ -147,6 +155,7 @@ function App(): JSX.Element {
           />
         ) : null}
         {tab === 'hits' ? <HitLog /> : null}
+        {tab === 'debug' ? <DnrDebug /> : null}
         {tab === 'capture' ? (
           <Capture
             groups={state.groups}

@@ -277,6 +277,62 @@ html,
   padding: 24px;
 }
 
+.pm-debug {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.pm-debug-section {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 12px;
+}
+
+.pm-debug-heading {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.pm-debug-muted {
+  color: var(--fg-muted);
+  font-size: 12px;
+}
+
+.pm-debug-error {
+  color: var(--danger);
+  font-size: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.pm-debug-pre {
+  background: var(--bg-subtle, rgba(0, 0, 0, 0.04));
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 8px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  max-height: 320px;
+  overflow: auto;
+  margin: 8px 0 0;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.pm-debug-form {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.pm-debug-result {
+  font-size: 12px;
+}
+
 .pm-checkbox {
   display: inline-flex;
   align-items: center;
@@ -812,4 +868,15 @@ button.pm-json-clickable {
 }
 .pm-toggle.pm-toggle-sm:checked::after {
   transform: translateX(13px);
+}
+
+/* Inline link-style button used for quick-fix actions in warnings. */
+.pm-link {
+  background: none;
+  border: none;
+  color: var(--accent);
+  cursor: pointer;
+  padding: 0;
+  font: inherit;
+  text-decoration: underline;
 }

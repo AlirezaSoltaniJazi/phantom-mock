@@ -11,13 +11,22 @@ export type StateMutation =
   | { kind: 'setMasterEnabled'; enabled: boolean }
   | { kind: 'replaceState'; state: AppState };
 
+export interface DnrTestRequest {
+  url: string;
+  method: string;
+  type: chrome.declarativeNetRequest.ResourceType;
+}
+
 export type RuntimeMessage =
   | { type: typeof MESSAGE_TYPES.GET_STATE }
   | { type: typeof MESSAGE_TYPES.MUTATE_STATE; mutation: StateMutation }
   | { type: typeof MESSAGE_TYPES.RULES_UPDATED; state: AppState }
   | { type: typeof MESSAGE_TYPES.MOCK_HIT; hit: MockHit }
   | { type: typeof MESSAGE_TYPES.GET_HIT_LOG }
-  | { type: typeof MESSAGE_TYPES.CLEAR_HIT_LOG };
+  | { type: typeof MESSAGE_TYPES.CLEAR_HIT_LOG }
+  | { type: typeof MESSAGE_TYPES.GET_DNR_DEBUG }
+  | { type: typeof MESSAGE_TYPES.TEST_DNR_MATCH; request: DnrTestRequest }
+  | { type: typeof MESSAGE_TYPES.CLEAR_DNR_MATCH_LOG };
 
 export function isRuntimeMessage(value: unknown): value is RuntimeMessage {
   if (typeof value !== 'object' || value === null) return false;

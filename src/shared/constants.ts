@@ -13,10 +13,14 @@ export const MESSAGE_TYPES = {
   MOCK_HIT: 'MOCK_HIT',
   GET_HIT_LOG: 'GET_HIT_LOG',
   CLEAR_HIT_LOG: 'CLEAR_HIT_LOG',
+  GET_DNR_DEBUG: 'GET_DNR_DEBUG',
+  TEST_DNR_MATCH: 'TEST_DNR_MATCH',
+  CLEAR_DNR_MATCH_LOG: 'CLEAR_DNR_MATCH_LOG',
 } as const;
 
 export const PORT_NAMES = {
   HIT_LOG: 'phantom-mock.hit-log',
+  DNR_MATCH_LOG: 'phantom-mock.dnr-match-log',
 } as const;
 
 export const PAGE_MESSAGE_SOURCE = 'phantom-mock';
@@ -31,6 +35,7 @@ export const DEFAULT_GROUP_NAME = 'Default';
 
 export const MAX_RULES = 4000;
 export const MAX_HIT_LOG_ENTRIES = 500;
+export const MAX_DNR_MATCH_ENTRIES = 200;
 export const MAX_DELAY_MS = 60_000;
 export const MIN_STATUS_CODE = 100;
 export const MAX_STATUS_CODE = 599;

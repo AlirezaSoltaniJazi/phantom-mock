@@ -218,6 +218,19 @@ export function RuleEditor({
                 </option>
               ))}
             </select>
+            {draft.action.kind === 'header' && draft.match.method !== '*' ? (
+              <div className="pm-warn" style={{ marginTop: 6 }}>
+                Only matches {draft.match.method} requests. Redirected GETs and other verbs won't
+                get the header.{' '}
+                <button
+                  type="button"
+                  className="pm-link"
+                  onClick={() => setDraft({ ...draft, match: { ...draft.match, method: '*' } })}
+                >
+                  Set to *
+                </button>
+              </div>
+            ) : null}
           </div>
           <div className="pm-field" style={{ flex: 1 }}>
             <label>URL match</label>

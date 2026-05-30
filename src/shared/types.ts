@@ -61,6 +61,15 @@ export interface Group {
   order: number;
 }
 
+export interface DnrMatchEntry {
+  ts: number;
+  dnrRuleId: number;
+  ruleName: string | null;
+  ruleId: string | null;
+  url: string;
+  method: string;
+}
+
 export interface MockHit {
   ruleId: string;
   ruleName: string;

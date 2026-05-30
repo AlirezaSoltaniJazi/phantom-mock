@@ -40,11 +40,15 @@ export function subscribe(listener: (next: AppState) => void): () => void {
     if (area !== 'local') return;
     const change = changes[STORAGE_KEYS.APP_STATE];
     if (!change) return;
+    console.log(
+      `[pm-debug] storage:change keys=${Object.keys(changes).join(',')} newRules=${(change.newValue as AppState)?.rules?.length}`
+    );
     if (isAppState(change.newValue)) {
       listener(change.newValue);
     }
   };
   chrome.storage.onChanged.addListener(handler);
+  console.log('[pm-debug] storage:subscribed');
   return () => chrome.storage.onChanged.removeListener(handler);
 }
 
