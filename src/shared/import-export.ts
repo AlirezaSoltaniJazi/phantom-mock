@@ -2,6 +2,7 @@ import {
   CURRENT_SCHEMA_VERSION,
   HTTP_METHODS,
   type AppState,
+  type CookieProfile,
   type ExportBundle,
   type Group,
   type HeaderOp,
@@ -22,6 +23,7 @@ export function buildExportBundle(state: AppState): ExportBundle {
     groups: state.groups,
     rules: state.rules,
     storageProfiles: state.storageProfiles,
+    cookieProfiles: state.cookieProfiles,
   };
 }
 
@@ -29,6 +31,7 @@ export interface ExportSelection {
   groupIds: Set<string>;
   ruleIds: Set<string>;
   storageProfileIds: Set<string>;
+  cookieProfileIds: Set<string>;
 }
 
 export function buildSelectiveExportBundle(
@@ -42,12 +45,14 @@ export function buildSelectiveExportBundle(
   const storageProfiles = state.storageProfiles.filter((p) =>
     selection.storageProfileIds.has(p.id)
   );
+  const cookieProfiles = state.cookieProfiles.filter((p) => selection.cookieProfileIds.has(p.id));
   return {
     schemaVersion: CURRENT_SCHEMA_VERSION,
     exportedAt: new Date().toISOString(),
     groups,
     rules,
     storageProfiles,
+    cookieProfiles,
   };
 }
 
@@ -59,12 +64,16 @@ export function filterBundle(bundle: ExportBundle, selection: ExportSelection): 
   const storageProfiles = (bundle.storageProfiles ?? []).filter((p) =>
     selection.storageProfileIds.has(p.id)
   );
+  const cookieProfiles = (bundle.cookieProfiles ?? []).filter((p) =>
+    selection.cookieProfileIds.has(p.id)
+  );
   return {
     schemaVersion: CURRENT_SCHEMA_VERSION,
     exportedAt: bundle.exportedAt,
     groups,
     rules,
     storageProfiles,
+    cookieProfiles,
   };
 }
 
@@ -121,6 +130,19 @@ export function validateBundle(value: unknown): Result<ExportBundle> {
       storageProfiles.push(r.value);
     }
   }
+  // `cookieProfiles` is optional in bundles for backward compatibility with
+  // pre-0.5.0 exports. Validate when present, otherwise default to [].
+  const cookieProfiles: CookieProfile[] = [];
+  if (obj.cookieProfiles !== undefined) {
+    if (!Array.isArray(obj.cookieProfiles)) {
+      return { ok: false, error: '`cookieProfiles` must be an array' };
+    }
+    for (let i = 0; i < obj.cookieProfiles.length; i++) {
+      const r = validateCookieProfile(obj.cookieProfiles[i], i);
+      if (!r.ok) return r;
+      cookieProfiles.push(r.value);
+    }
+  }
   return {
     ok: true,
     value: {
@@ -129,6 +151,7 @@ export function validateBundle(value: unknown): Result<ExportBundle> {
       groups,
       rules,
       storageProfiles,
+      cookieProfiles,
     },
   };
 }
@@ -175,6 +198,59 @@ function validateStorageProfile(value: unknown, index: number): Result<StoragePr
   if (typeof p.suffix === 'string') profile.suffix = p.suffix;
   else if (p.suffix !== undefined) {
     return { ok: false, error: `storageProfiles[${index}].suffix must be a string` };
+  }
+  return { ok: true, value: profile };
+}
+
+function validateCookieProfile(value: unknown, index: number): Result<CookieProfile> {
+  if (typeof value !== 'object' || value === null) {
+    return { ok: false, error: `cookieProfiles[${index}] must be an object` };
+  }
+  const p = value as Record<string, unknown>;
+  if (typeof p.id !== 'string' || p.id.length === 0) {
+    return { ok: false, error: `cookieProfiles[${index}].id must be a non-empty string` };
+  }
+  if (typeof p.name !== 'string') {
+    return { ok: false, error: `cookieProfiles[${index}].name must be a string` };
+  }
+  if (typeof p.cookieName !== 'string' || p.cookieName.length === 0) {
+    return {
+      ok: false,
+      error: `cookieProfiles[${index}].cookieName must be a non-empty string`,
+    };
+  }
+  if (typeof p.enabled !== 'boolean') {
+    return { ok: false, error: `cookieProfiles[${index}].enabled must be a boolean` };
+  }
+  if (!Array.isArray(p.values)) {
+    return { ok: false, error: `cookieProfiles[${index}].values must be an array` };
+  }
+  const values: string[] = [];
+  for (let i = 0; i < p.values.length; i++) {
+    const v = p.values[i];
+    if (typeof v !== 'string') {
+      return { ok: false, error: `cookieProfiles[${index}].values[${i}] must be a string` };
+    }
+    values.push(v);
+  }
+  const profile: CookieProfile = {
+    id: p.id,
+    name: p.name,
+    cookieName: p.cookieName,
+    values,
+    enabled: p.enabled,
+  };
+  if (typeof p.path === 'string') profile.path = p.path;
+  else if (p.path !== undefined) {
+    return { ok: false, error: `cookieProfiles[${index}].path must be a string` };
+  }
+  if (typeof p.prefix === 'string') profile.prefix = p.prefix;
+  else if (p.prefix !== undefined) {
+    return { ok: false, error: `cookieProfiles[${index}].prefix must be a string` };
+  }
+  if (typeof p.suffix === 'string') profile.suffix = p.suffix;
+  else if (p.suffix !== undefined) {
+    return { ok: false, error: `cookieProfiles[${index}].suffix must be a string` };
   }
   return { ok: true, value: profile };
 }
@@ -362,6 +438,7 @@ export function applyImport(
   strategy: ImportStrategy
 ): AppState {
   const bundleProfiles = bundle.storageProfiles ?? [];
+  const bundleCookieProfiles = bundle.cookieProfiles ?? [];
   switch (strategy) {
     case 'replace':
       return {
@@ -370,6 +447,7 @@ export function applyImport(
         groups: bundle.groups,
         rules: bundle.rules,
         storageProfiles: bundleProfiles,
+        cookieProfiles: bundleCookieProfiles,
       };
     case 'merge-by-id': {
       const groupMap = new Map(current.groups.map((g) => [g.id, g]));
@@ -378,12 +456,15 @@ export function applyImport(
       for (const r of bundle.rules) ruleMap.set(r.id, r);
       const profileMap = new Map(current.storageProfiles.map((p) => [p.id, p]));
       for (const p of bundleProfiles) profileMap.set(p.id, p);
+      const cookieMap = new Map(current.cookieProfiles.map((p) => [p.id, p]));
+      for (const p of bundleCookieProfiles) cookieMap.set(p.id, p);
       return {
         schemaVersion: CURRENT_SCHEMA_VERSION,
         masterEnabled: current.masterEnabled,
         groups: [...groupMap.values()],
         rules: [...ruleMap.values()],
         storageProfiles: [...profileMap.values()],
+        cookieProfiles: [...cookieMap.values()],
       };
     }
     case 'append-as-new': {
@@ -403,12 +484,17 @@ export function applyImport(
       for (const p of bundleProfiles) {
         storageProfiles.push({ ...p, id: generateId('sprof') });
       }
+      const cookieProfiles = [...current.cookieProfiles];
+      for (const p of bundleCookieProfiles) {
+        cookieProfiles.push({ ...p, id: generateId('cprof') });
+      }
       return {
         schemaVersion: CURRENT_SCHEMA_VERSION,
         masterEnabled: current.masterEnabled,
         groups,
         rules,
         storageProfiles,
+        cookieProfiles,
       };
     }
   }
@@ -431,24 +517,31 @@ export interface ImportConflicts {
   ruleIds: Set<string>;
   groupIds: Set<string>;
   storageProfileIds: Set<string>;
+  cookieProfileIds: Set<string>;
 }
 
 export interface ImportResolutions {
   rules: Map<string, ConflictResolution>;
   groups: Map<string, ConflictResolution>;
   storageProfiles: Map<string, ConflictResolution>;
+  cookieProfiles: Map<string, ConflictResolution>;
 }
 
 export function detectConflicts(current: AppState, bundle: ExportBundle): ImportConflicts {
   const currentRuleIds = new Set(current.rules.map((r) => r.id));
   const currentGroupIds = new Set(current.groups.map((g) => g.id));
   const currentProfileIds = new Set(current.storageProfiles.map((p) => p.id));
+  const currentCookieProfileIds = new Set(current.cookieProfiles.map((p) => p.id));
   const bundleProfiles = bundle.storageProfiles ?? [];
+  const bundleCookieProfiles = bundle.cookieProfiles ?? [];
   return {
     ruleIds: new Set(bundle.rules.filter((r) => currentRuleIds.has(r.id)).map((r) => r.id)),
     groupIds: new Set(bundle.groups.filter((g) => currentGroupIds.has(g.id)).map((g) => g.id)),
     storageProfileIds: new Set(
       bundleProfiles.filter((p) => currentProfileIds.has(p.id)).map((p) => p.id)
+    ),
+    cookieProfileIds: new Set(
+      bundleCookieProfiles.filter((p) => currentCookieProfileIds.has(p.id)).map((p) => p.id)
     ),
   };
 }
@@ -520,11 +613,28 @@ export function applyImportWithResolutions(
     profileNames.add(newName);
   }
 
+  const cookieMap = new Map(current.cookieProfiles.map((p) => [p.id, p]));
+  const cookieNames = new Set(current.cookieProfiles.map((p) => p.name));
+  for (const p of bundle.cookieProfiles ?? []) {
+    const conflicts = cookieMap.has(p.id);
+    const resolution = resolutions.cookieProfiles.get(p.id) ?? 'overwrite';
+    if (!conflicts || resolution === 'overwrite') {
+      cookieMap.set(p.id, p);
+      cookieNames.add(p.name);
+      continue;
+    }
+    const newId = generateId('cprof');
+    const newName = uniqueName(p.name, cookieNames);
+    cookieMap.set(newId, { ...p, id: newId, name: newName });
+    cookieNames.add(newName);
+  }
+
   return {
     schemaVersion: CURRENT_SCHEMA_VERSION,
     masterEnabled: current.masterEnabled,
     groups: [...groupMap.values()],
     rules: [...ruleMap.values()],
     storageProfiles: [...profileMap.values()],
+    cookieProfiles: [...cookieMap.values()],
   };
 }

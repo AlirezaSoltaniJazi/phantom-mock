@@ -27,6 +27,7 @@ function makeState(profiles: StorageProfile[]): AppState {
     groups: [{ id: DEFAULT_GROUP_ID, name: 'Default', enabled: true, order: 0 }],
     rules: [],
     storageProfiles: profiles,
+    cookieProfiles: [],
   };
 }
 
@@ -173,6 +174,7 @@ describe('StorageProfile import/export', () => {
     const next = applyImportWithResolutions(current, bundle, {
       rules: new Map(),
       groups: new Map(),
+      cookieProfiles: new Map(),
       storageProfiles: new Map([
         ['sprof_a', 'overwrite'],
         ['sprof_b', 'rename'],

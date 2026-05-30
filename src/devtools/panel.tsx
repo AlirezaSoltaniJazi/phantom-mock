@@ -7,10 +7,13 @@ import { HitLog } from './components/HitLog';
 import { DnrDebug } from './components/DnrDebug';
 import { StorageTab } from './components/StorageTab';
 import { StorageEditor } from './components/StorageEditor';
+import { CookiesTab } from './components/CookiesTab';
+import { CookiesEditor } from './components/CookiesEditor';
 import { Settings } from './components/Settings';
 import { Capture } from './capture/Capture';
 import { useCapture } from './capture/use-capture';
-import type { Group, Rule, StorageProfile } from '@/shared/types';
+import type { Group, Rule } from '@/shared/types';
+import type { StorageProfile, CookieProfile } from '@/shared/types';
 import { STORAGE_KEYS } from '@/shared/constants';
 import { usePrefs, applyFontSizeVar } from '@/shared/use-prefs';
 import { newId } from '@/utils/id';
@@ -21,6 +24,8 @@ type Tab =
   | 'editor'
   | 'storage'
   | 'storage-editor'
+  | 'cookies'
+  | 'cookies-editor'
   | 'hits'
   | 'debug'
   | 'capture'
@@ -32,6 +37,7 @@ function App(): JSX.Element {
   const [tab, setTab] = useState<Tab>('rules');
   const [editing, setEditing] = useState<Rule | null>(null);
   const [editingProfile, setEditingProfile] = useState<StorageProfile | null>(null);
+  const [editingCookieProfile, setEditingCookieProfile] = useState<CookieProfile | null>(null);
   const [captureFilter, setCaptureFilter] = useState('');
   const [recording, setRecording] = useState(true);
   const capture = useCapture({ hostFilter: captureFilter, recording });
@@ -115,6 +121,23 @@ function App(): JSX.Element {
           }}
         >
           Storage Editor
+        </button>
+        <button
+          type="button"
+          className={`pm-tab ${tab === 'cookies' ? 'is-active' : ''}`}
+          onClick={() => setTab('cookies')}
+        >
+          Cookies
+        </button>
+        <button
+          type="button"
+          className={`pm-tab ${tab === 'cookies-editor' ? 'is-active' : ''}`}
+          onClick={() => {
+            setEditingCookieProfile(null);
+            setTab('cookies-editor');
+          }}
+        >
+          Cookies Editor
         </button>
         <button
           type="button"
@@ -220,6 +243,49 @@ function App(): JSX.Element {
                     });
                     setEditingProfile(null);
                     setTab('storage');
+                  },
+                }
+              : {})}
+          />
+        ) : null}
+        {tab === 'cookies' ? (
+          <CookiesTab
+            state={state}
+            mutate={mutate}
+            prefs={prefs}
+            setPrefs={setPrefs}
+            onEdit={(profile) => {
+              setEditingCookieProfile(profile);
+              setTab('cookies-editor');
+            }}
+            onNew={() => {
+              setEditingCookieProfile(null);
+              setTab('cookies-editor');
+            }}
+          />
+        ) : null}
+        {tab === 'cookies-editor' ? (
+          <CookiesEditor
+            key={editingCookieProfile?.id ?? 'new'}
+            initial={editingCookieProfile}
+            onSave={(profile) => {
+              void mutate({ kind: 'upsertCookieProfile', profile });
+              setEditingCookieProfile(null);
+              setTab('cookies');
+            }}
+            onCancel={() => {
+              setEditingCookieProfile(null);
+              setTab('cookies');
+            }}
+            {...(editingCookieProfile
+              ? {
+                  onDelete: () => {
+                    void mutate({
+                      kind: 'deleteCookieProfile',
+                      profileId: editingCookieProfile.id,
+                    });
+                    setEditingCookieProfile(null);
+                    setTab('cookies');
                   },
                 }
               : {})}

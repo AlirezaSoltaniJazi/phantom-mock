@@ -74,6 +74,22 @@ export interface StorageProfile {
   enabled: boolean;
 }
 
+export interface CookieProfile {
+  id: string;
+  // Human-friendly label shown in the panel (e.g. "Language").
+  name: string;
+  // The actual cookie name written via chrome.cookies (e.g. "django_language").
+  cookieName: string;
+  // Cookie path. Defaults to '/' at write time when missing.
+  path?: string;
+  values: string[];
+  // Optional wrappers applied when SETTING a value: the stored cookie value is
+  // `prefix + value + suffix`. Mirrors StorageProfile prefix/suffix semantics.
+  prefix?: string;
+  suffix?: string;
+  enabled: boolean;
+}
+
 export interface DnrMatchEntry {
   ts: number;
   dnrRuleId: number;
@@ -102,6 +118,7 @@ export interface AppState {
   groups: Group[];
   rules: Rule[];
   storageProfiles: StorageProfile[];
+  cookieProfiles: CookieProfile[];
 }
 
 export interface ExportBundle {
@@ -110,6 +127,7 @@ export interface ExportBundle {
   groups: Group[];
   rules: Rule[];
   storageProfiles?: StorageProfile[];
+  cookieProfiles?: CookieProfile[];
 }
 
 export type ImportStrategy = 'replace' | 'merge-by-id' | 'append-as-new';

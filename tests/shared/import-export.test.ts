@@ -28,6 +28,7 @@ const baseState: AppState = {
   groups: [baseGroup],
   rules: [baseRule],
   storageProfiles: [],
+  cookieProfiles: [],
 };
 
 describe('buildExportBundle / parseExportBundle', () => {

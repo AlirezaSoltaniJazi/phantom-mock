@@ -9,6 +9,7 @@ import {
   registerDnrMatchListener,
   registerDnrMatchPortListener,
 } from './dnr-match-log';
+import { getCookie, setCookie, removeCookie } from './cookies';
 
 // Stash the last failure from chrome.declarativeNetRequest.updateDynamicRules
 // so the DevTools Debug tab can show it. Cleared on each successful sync.
@@ -88,6 +89,20 @@ function applyMutation(state: AppState, mutation: StateMutation): AppState {
         p.id === mutation.profileId ? { ...p, enabled: mutation.enabled } : p
       );
       return { ...state, storageProfiles };
+    }
+    case 'upsertCookieProfile': {
+      const cookieProfiles = upsertById(state.cookieProfiles, mutation.profile);
+      return { ...state, cookieProfiles };
+    }
+    case 'deleteCookieProfile': {
+      const cookieProfiles = state.cookieProfiles.filter((p) => p.id !== mutation.profileId);
+      return { ...state, cookieProfiles };
+    }
+    case 'toggleCookieProfile': {
+      const cookieProfiles = state.cookieProfiles.map((p) =>
+        p.id === mutation.profileId ? { ...p, enabled: mutation.enabled } : p
+      );
+      return { ...state, cookieProfiles };
     }
     case 'replaceState':
       return { ...mutation.state, schemaVersion: CURRENT_SCHEMA_VERSION };
@@ -198,6 +213,33 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
             lastSyncError: lastDnrSyncError,
           });
         })
+        .catch((err: Error) => sendResponse({ ok: false, error: err.message }));
+      return true;
+
+    case MESSAGE_TYPES.COOKIES_GET:
+      getCookie(message.tabId, message.name, message.path)
+        .then((cookie) => sendResponse({ ok: true, cookie }))
+        .catch((err: Error) => sendResponse({ ok: false, error: err.message }));
+      return true;
+
+    case MESSAGE_TYPES.COOKIES_SET: {
+      // Build the setCookie arg with exact-optional-property semantics: only
+      // include `path` when the caller actually provided one.
+      const req = {
+        tabId: message.tabId,
+        name: message.name,
+        value: message.value,
+        ...(message.path !== undefined ? { path: message.path } : {}),
+      };
+      setCookie(req)
+        .then((cookie) => sendResponse({ ok: true, cookie }))
+        .catch((err: Error) => sendResponse({ ok: false, error: err.message }));
+      return true;
+    }
+
+    case MESSAGE_TYPES.COOKIES_REMOVE:
+      removeCookie(message.tabId, message.name, message.path)
+        .then(() => sendResponse({ ok: true }))
         .catch((err: Error) => sendResponse({ ok: false, error: err.message }));
       return true;
 

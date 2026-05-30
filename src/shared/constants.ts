@@ -16,6 +16,9 @@ export const MESSAGE_TYPES = {
   GET_DNR_DEBUG: 'GET_DNR_DEBUG',
   TEST_DNR_MATCH: 'TEST_DNR_MATCH',
   CLEAR_DNR_MATCH_LOG: 'CLEAR_DNR_MATCH_LOG',
+  COOKIES_GET: 'COOKIES_GET',
+  COOKIES_SET: 'COOKIES_SET',
+  COOKIES_REMOVE: 'COOKIES_REMOVE',
 } as const;
 
 export const PORT_NAMES = {
@@ -35,6 +38,7 @@ export const DEFAULT_GROUP_NAME = 'Default';
 
 export const MAX_RULES = 4000;
 export const MAX_STORAGE_PROFILES = 200;
+export const MAX_COOKIE_PROFILES = 200;
 export const MAX_HIT_LOG_ENTRIES = 500;
 export const MAX_DNR_MATCH_ENTRIES = 200;
 export const MAX_DELAY_MS = 60_000;

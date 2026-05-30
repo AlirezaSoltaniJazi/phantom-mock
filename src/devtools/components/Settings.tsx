@@ -14,6 +14,7 @@ import {
   FONT_SIZE_PX,
   clampFontSize,
   type AppState,
+  type CookieProfile,
   type ExportBundle,
   type FontSizeMode,
   type Group,
@@ -117,6 +118,7 @@ type ExportSelectionState = {
   groups: Set<string>;
   rules: Set<string>;
   storageProfiles: Set<string>;
+  cookieProfiles: Set<string>;
 };
 
 function ExportPanel({ state }: { state: AppState }): JSX.Element {
@@ -126,9 +128,15 @@ function ExportPanel({ state }: { state: AppState }): JSX.Element {
   function toggleAll(): void {
     const everythingOn =
       selection.rules.size === state.rules.length &&
-      selection.storageProfiles.size === state.storageProfiles.length;
+      selection.storageProfiles.size === state.storageProfiles.length &&
+      selection.cookieProfiles.size === state.cookieProfiles.length;
     if (everythingOn) {
-      setSelection({ groups: new Set(), rules: new Set(), storageProfiles: new Set() });
+      setSelection({
+        groups: new Set(),
+        rules: new Set(),
+        storageProfiles: new Set(),
+        cookieProfiles: new Set(),
+      });
     } else {
       setSelection(allSelected(state));
     }
@@ -171,13 +179,29 @@ function ExportPanel({ state }: { state: AppState }): JSX.Element {
     });
   }
 
+  function toggleCookieProfile(p: CookieProfile): void {
+    const next = new Set(selection.cookieProfiles);
+    if (next.has(p.id)) next.delete(p.id);
+    else next.add(p.id);
+    setSelection({ ...selection, cookieProfiles: next });
+  }
+
+  function toggleAllCookieProfiles(): void {
+    const allOn = selection.cookieProfiles.size === state.cookieProfiles.length;
+    setSelection({
+      ...selection,
+      cookieProfiles: allOn ? new Set() : new Set(state.cookieProfiles.map((p) => p.id)),
+    });
+  }
+
   function downloadSelection(): void {
     if (
       selection.rules.size === 0 &&
       selection.groups.size === 0 &&
-      selection.storageProfiles.size === 0
+      selection.storageProfiles.size === 0 &&
+      selection.cookieProfiles.size === 0
     ) {
-      setError('Select at least one rule, group, or storage profile to export.');
+      setError('Select at least one rule, group, storage profile, or cookie profile to export.');
       return;
     }
     setError(null);
@@ -185,6 +209,7 @@ function ExportPanel({ state }: { state: AppState }): JSX.Element {
       groupIds: selection.groups,
       ruleIds: selection.rules,
       storageProfileIds: selection.storageProfiles,
+      cookieProfileIds: selection.cookieProfiles,
     });
     const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
     const blob = new Blob([JSON.stringify(bundle, null, 2)], {
@@ -200,9 +225,14 @@ function ExportPanel({ state }: { state: AppState }): JSX.Element {
 
   const totalRules = state.rules.length;
   const totalProfiles = state.storageProfiles.length;
+  const totalCookieProfiles = state.cookieProfiles.length;
   const selectedRules = selection.rules.size;
   const selectedProfiles = selection.storageProfiles.size;
-  const everythingOn = selectedRules === totalRules && selectedProfiles === totalProfiles;
+  const selectedCookieProfiles = selection.cookieProfiles.size;
+  const everythingOn =
+    selectedRules === totalRules &&
+    selectedProfiles === totalProfiles &&
+    selectedCookieProfiles === totalCookieProfiles;
 
   return (
     <fieldset className="pm-fieldset">
@@ -215,6 +245,9 @@ function ExportPanel({ state }: { state: AppState }): JSX.Element {
           {selectedRules}/{totalRules} rule{totalRules === 1 ? '' : 's'}
           {totalProfiles > 0
             ? ` · ${selectedProfiles}/${totalProfiles} profile${totalProfiles === 1 ? '' : 's'}`
+            : ''}
+          {totalCookieProfiles > 0
+            ? ` · ${selectedCookieProfiles}/${totalCookieProfiles} cookie${totalCookieProfiles === 1 ? '' : 's'}`
             : ''}
         </span>
         <div style={{ flex: 1 }} />
@@ -229,6 +262,8 @@ function ExportPanel({ state }: { state: AppState }): JSX.Element {
         onToggleRule={toggleRule}
         onToggleProfile={toggleProfile}
         onToggleAllProfiles={toggleAllProfiles}
+        onToggleCookieProfile={toggleCookieProfile}
+        onToggleAllCookieProfiles={toggleAllCookieProfiles}
       />
       {error ? <div className="pm-error">{error}</div> : null}
     </fieldset>
@@ -250,6 +285,7 @@ function ImportPanel({
     rules: new Map(),
     groups: new Map(),
     storageProfiles: new Map(),
+    cookieProfiles: new Map(),
   }));
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
@@ -272,6 +308,7 @@ function ImportPanel({
       groups: new Set(parsed.value.groups.map((g) => g.id)),
       rules: new Set(parsed.value.rules.map((r) => r.id)),
       storageProfiles: new Set((parsed.value.storageProfiles ?? []).map((p) => p.id)),
+      cookieProfiles: new Set((parsed.value.cookieProfiles ?? []).map((p) => p.id)),
     });
     const conf = detectConflicts(state, parsed.value);
     setConflicts(conf);
@@ -281,6 +318,7 @@ function ImportPanel({
       rules: new Map([...conf.ruleIds].map((id) => [id, 'overwrite' as const])),
       groups: new Map([...conf.groupIds].map((id) => [id, 'overwrite' as const])),
       storageProfiles: new Map([...conf.storageProfileIds].map((id) => [id, 'overwrite' as const])),
+      cookieProfiles: new Map([...conf.cookieProfileIds].map((id) => [id, 'overwrite' as const])),
     });
   }
 
@@ -292,6 +330,13 @@ function ImportPanel({
     setResolutions((prev) => ({
       ...prev,
       storageProfiles: new Map(prev.storageProfiles).set(profileId, res),
+    }));
+  }
+
+  function setCookieProfileResolution(profileId: string, res: ConflictResolution): void {
+    setResolutions((prev) => ({
+      ...prev,
+      cookieProfiles: new Map(prev.cookieProfiles).set(profileId, res),
     }));
   }
 
@@ -337,19 +382,39 @@ function ImportPanel({
     });
   }
 
+  function toggleCookieProfile(p: CookieProfile): void {
+    if (!selection) return;
+    const next = new Set(selection.cookieProfiles);
+    if (next.has(p.id)) next.delete(p.id);
+    else next.add(p.id);
+    setSelection({ ...selection, cookieProfiles: next });
+  }
+
+  function toggleAllCookieProfiles(): void {
+    if (!selection || !bundle) return;
+    const profiles = bundle.cookieProfiles ?? [];
+    const allOn = selection.cookieProfiles.size === profiles.length;
+    setSelection({
+      ...selection,
+      cookieProfiles: allOn ? new Set() : new Set(profiles.map((p) => p.id)),
+    });
+  }
+
   async function performImport(): Promise<void> {
     if (!bundle || !selection) return;
     const filtered = filterBundle(bundle, {
       groupIds: selection.groups,
       ruleIds: selection.rules,
       storageProfileIds: selection.storageProfiles,
+      cookieProfileIds: selection.cookieProfiles,
     });
     if (
       filtered.rules.length === 0 &&
       filtered.groups.length === 0 &&
-      (filtered.storageProfiles?.length ?? 0) === 0
+      (filtered.storageProfiles?.length ?? 0) === 0 &&
+      (filtered.cookieProfiles?.length ?? 0) === 0
     ) {
-      setError('Select at least one rule, group, or storage profile to import.');
+      setError('Select at least one rule, group, storage profile, or cookie profile to import.');
       return;
     }
     const next =
@@ -361,10 +426,14 @@ function ImportPanel({
     const renamedProfiles = [...resolutions.storageProfiles.values()].filter(
       (r) => r === 'rename'
     ).length;
-    const renameTotal = renamedRules + renamedProfiles;
+    const renamedCookieProfiles = [...resolutions.cookieProfiles.values()].filter(
+      (r) => r === 'rename'
+    ).length;
+    const renameTotal = renamedRules + renamedProfiles + renamedCookieProfiles;
     const profileCount = filtered.storageProfiles?.length ?? 0;
+    const cookieProfileCount = filtered.cookieProfiles?.length ?? 0;
     setInfo(
-      `Imported ${filtered.rules.length} rule(s), ${filtered.groups.length} group(s), and ${profileCount} storage profile(s)` +
+      `Imported ${filtered.rules.length} rule(s), ${filtered.groups.length} group(s), ${profileCount} storage profile(s), and ${cookieProfileCount} cookie profile(s)` +
         (strategy === 'merge-by-id' && renameTotal > 0
           ? ` (${renameTotal} renamed to avoid id conflict).`
           : '.')
@@ -372,7 +441,12 @@ function ImportPanel({
     setBundle(null);
     setSelection(null);
     setConflicts(null);
-    setResolutions({ rules: new Map(), groups: new Map(), storageProfiles: new Map() });
+    setResolutions({
+      rules: new Map(),
+      groups: new Map(),
+      storageProfiles: new Map(),
+      cookieProfiles: new Map(),
+    });
     if (fileRef.current) fileRef.current.value = '';
   }
 
@@ -384,6 +458,7 @@ function ImportPanel({
       groups: bundle.groups,
       rules: bundle.rules,
       storageProfiles: bundle.storageProfiles ?? [],
+      cookieProfiles: bundle.cookieProfiles ?? [],
     };
   }, [bundle, state.masterEnabled]);
 
@@ -419,6 +494,9 @@ function ImportPanel({
               {(bundle?.storageProfiles?.length ?? 0) > 0
                 ? ` · ${selection.storageProfiles.size}/${bundle?.storageProfiles?.length ?? 0} profile${(bundle?.storageProfiles?.length ?? 0) === 1 ? '' : 's'}`
                 : ''}
+              {(bundle?.cookieProfiles?.length ?? 0) > 0
+                ? ` · ${selection.cookieProfiles.size}/${bundle?.cookieProfiles?.length ?? 0} cookie${(bundle?.cookieProfiles?.length ?? 0) === 1 ? '' : 's'}`
+                : ''}
             </span>
             <div style={{ flex: 1 }} />
             <button type="button" className="pm-btn" onClick={() => void performImport()}>
@@ -432,10 +510,13 @@ function ImportPanel({
             onToggleRule={toggleRule}
             onToggleProfile={toggleProfile}
             onToggleAllProfiles={toggleAllProfiles}
+            onToggleCookieProfile={toggleCookieProfile}
+            onToggleAllCookieProfiles={toggleAllCookieProfiles}
             conflicts={strategy === 'merge-by-id' ? conflicts : null}
             resolutions={resolutions}
             onSetRuleResolution={setRuleResolution}
             onSetProfileResolution={setProfileResolution}
+            onSetCookieProfileResolution={setCookieProfileResolution}
           />
         </>
       ) : null}
@@ -452,10 +533,13 @@ interface SelectionTreeProps {
   onToggleRule: (r: Rule) => void;
   onToggleProfile: (p: StorageProfile) => void;
   onToggleAllProfiles: () => void;
+  onToggleCookieProfile: (p: CookieProfile) => void;
+  onToggleAllCookieProfiles: () => void;
   conflicts?: ImportConflicts | null;
   resolutions?: ImportResolutions;
   onSetRuleResolution?: (ruleId: string, res: ConflictResolution) => void;
   onSetProfileResolution?: (profileId: string, res: ConflictResolution) => void;
+  onSetCookieProfileResolution?: (profileId: string, res: ConflictResolution) => void;
 }
 
 function SelectionTree({
@@ -465,15 +549,21 @@ function SelectionTree({
   onToggleRule,
   onToggleProfile,
   onToggleAllProfiles,
+  onToggleCookieProfile,
+  onToggleAllCookieProfiles,
   conflicts,
   resolutions,
   onSetRuleResolution,
   onSetProfileResolution,
+  onSetCookieProfileResolution,
 }: SelectionTreeProps): JSX.Element {
   const groups = [...state.groups].sort((a, b) => a.order - b.order);
   const profiles = state.storageProfiles;
   const allProfilesOn =
     profiles.length > 0 && profiles.every((p) => selection.storageProfiles.has(p.id));
+  const cookieProfiles = state.cookieProfiles;
+  const allCookieProfilesOn =
+    cookieProfiles.length > 0 && cookieProfiles.every((p) => selection.cookieProfiles.has(p.id));
   return (
     <div className="pm-selection-tree">
       {groups.map((g) => {
@@ -604,6 +694,61 @@ function SelectionTree({
           </div>
         </div>
       ) : null}
+
+      {cookieProfiles.length > 0 ? (
+        <div className="pm-selection-group">
+          <label className="pm-checkbox">
+            <input
+              type="checkbox"
+              checked={allCookieProfilesOn}
+              ref={(el) => {
+                if (!el) return;
+                el.indeterminate =
+                  !allCookieProfilesOn &&
+                  cookieProfiles.some((p) => selection.cookieProfiles.has(p.id));
+              }}
+              onChange={onToggleAllCookieProfiles}
+            />
+            <strong>Cookie profiles</strong>
+            <span style={{ color: 'var(--fg-muted)' }}> · {cookieProfiles.length}</span>
+          </label>
+          <div style={{ paddingLeft: 24 }}>
+            {cookieProfiles.map((p) => {
+              const profileConflict = conflicts?.cookieProfileIds.has(p.id) ?? false;
+              const profileResolution = resolutions?.cookieProfiles.get(p.id);
+              return (
+                <div key={p.id} className="pm-selection-rule-wrap">
+                  <label className="pm-checkbox" style={{ display: 'flex' }}>
+                    <input
+                      type="checkbox"
+                      checked={selection.cookieProfiles.has(p.id)}
+                      onChange={() => onToggleCookieProfile(p)}
+                    />
+                    <span className="pm-badge mock">COOKIE</span>
+                    <span style={{ marginLeft: 6, flex: 1 }} title={p.cookieName}>
+                      <strong>{p.name || '(unnamed)'}</strong>
+                      <br />
+                      <small style={{ color: 'var(--fg-muted)' }}>
+                        {p.cookieName} · {p.values.length} value{p.values.length === 1 ? '' : 's'}
+                      </small>
+                    </span>
+                  </label>
+                  {profileConflict && onSetCookieProfileResolution ? (
+                    <div className="pm-conflict-row">
+                      <span className="pm-conflict-badge">⚠ already exists</span>
+                      <ConflictRadio
+                        name={`cprof-${p.id}`}
+                        resolution={profileResolution}
+                        onChange={(res) => onSetCookieProfileResolution(p.id, res)}
+                      />
+                    </div>
+                  ) : null}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -647,5 +792,6 @@ function allSelected(state: AppState): ExportSelectionState {
     groups: new Set(state.groups.map((g) => g.id)),
     rules: new Set(state.rules.map((r) => r.id)),
     storageProfiles: new Set(state.storageProfiles.map((p) => p.id)),
+    cookieProfiles: new Set(state.cookieProfiles.map((p) => p.id)),
   };
 }

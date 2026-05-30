@@ -8,6 +8,7 @@ export function defaultState(): AppState {
     groups: [{ id: DEFAULT_GROUP_ID, name: DEFAULT_GROUP_NAME, enabled: true, order: 0 }],
     rules: [],
     storageProfiles: [],
+    cookieProfiles: [],
   };
 }
 
@@ -61,12 +62,14 @@ function migrate(raw: AppState): AppState {
     groups: raw.groups,
     rules: raw.rules,
     storageProfiles: Array.isArray(raw.storageProfiles) ? raw.storageProfiles : [],
+    cookieProfiles: Array.isArray(raw.cookieProfiles) ? raw.cookieProfiles : [],
   };
   return next;
 }
 
-// `storageProfiles` is intentionally NOT validated here — it's an additive
-// field handled by `migrate` so pre-feature state still loads cleanly.
+// `storageProfiles` and `cookieProfiles` are intentionally NOT validated here
+// — they're additive fields handled by `migrate` so pre-feature state still
+// loads cleanly.
 function isAppState(value: unknown): value is AppState {
   if (typeof value !== 'object' || value === null) return false;
   const v = value as Record<string, unknown>;
