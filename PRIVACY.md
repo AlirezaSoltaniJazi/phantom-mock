@@ -1,6 +1,6 @@
 # Phantom Mock — Privacy Policy
 
-_Last updated: 2026-05-16_
+_Last updated: 2026-05-30_
 
 ## Summary
 
@@ -10,12 +10,15 @@ and configuration are stored locally inside your browser via
 
 ## Data we handle
 
-| Data                                                    | Where it lives                                                                       | Sent off-device? |
-| ------------------------------------------------------- | ------------------------------------------------------------------------------------ | ---------------- |
-| Mock rules and groups you create                        | `chrome.storage.local` (your browser profile)                                        | No               |
-| Per-rule "hit" entries (URL, method, status, timestamp) | In-memory ring buffer inside the extension, cleared when the service worker restarts | No               |
-| URLs and HTTP methods of pages you browse               | Read transiently to evaluate match rules; not stored                                 | No               |
-| Telemetry / analytics                                   | We do not collect any                                                                | —                |
+| Data                                                    | Where it lives                                                                                                                                             | Sent off-device? |
+| ------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------- |
+| Mock rules and groups you create                        | `chrome.storage.local` (your browser profile)                                                                                                              | No               |
+| Storage profiles and cookie profiles you create         | `chrome.storage.local` (your browser profile)                                                                                                              | No               |
+| Per-rule "hit" entries (URL, method, status, timestamp) | In-memory ring buffer inside the extension, cleared when the service worker restarts                                                                       | No               |
+| URLs and HTTP methods of pages you browse               | Read transiently to evaluate match rules; not stored                                                                                                       | No               |
+| Inspected page localStorage values                      | Read/written only on the tab you have open in DevTools, in response to your click                                                                          | No               |
+| Inspected page cookies (incl. `httpOnly`)               | Read/written only on the tab you have open in DevTools, in response to your click. We do not enumerate cookies you haven't explicitly added a profile for. | No               |
+| Telemetry / analytics                                   | We do not collect any                                                                                                                                      | —                |
 
 ## Permissions and why we need them
 
@@ -23,6 +26,7 @@ and configuration are stored locally inside your browser via
 | -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `declarativeNetRequest`, `declarativeNetRequestFeedback` | Implement header overwrite rules at the network layer.                                                                                                                          |
 | `storage`                                                | Persist your rules and groups between browser sessions.                                                                                                                         |
+| `cookies`                                                | Read and write cookies on the inspected tab from the **Cookies** tab. Used only in response to your click on a candidate value; cookies are never read in the background.       |
 | `<all_urls>` host permission                             | Required to inject the mocking script on whichever site you choose to mock. Phantom Mock does not phone home; the host permission is used purely to apply the rules you define. |
 
 ## Third parties

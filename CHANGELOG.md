@@ -7,6 +7,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-05-30
+
+### Added
+
+- **Cookie profiles** — a new pair of DevTools panel tabs (**Cookies** and
+  **Cookies Editor**) that mirror the Storage Profile UX for cookies on the
+  inspected page. Define a profile once (label, cookie name, optional
+  path, candidate values) and flip the cookie with a single chip click.
+  Common case: `django_language` between `en` / `de` / `fr` without
+  touching the Application panel. Backed by `chrome.cookies.get` /
+  `chrome.cookies.set` / `chrome.cookies.remove` routed through the
+  service worker, so **httpOnly cookies are fully supported** (sessionid,
+  csrftoken, etc.) — `document.cookie` from the page would have silently
+  failed on those.
+- Cookie profiles round-trip through **Settings → Export / Import** as a
+  separate "Cookie profiles" section in the selection tree, with the same
+  per-item conflict resolution (`Overwrite` / `Rename as new`) as rules
+  and storage profiles. Pre-0.5.0 export bundles without `cookieProfiles`
+  still import cleanly.
+- Optional **prefix / suffix** value wrapping (introduced for storage
+  profiles in 0.4.0) also applies to cookie profiles — useful when a
+  cookie holds e.g. URL-encoded or JSON-quoted content.
+
+### Changed
+
+- **New manifest permission**: `cookies`. Required to read/write `httpOnly`
+  cookies via `chrome.cookies.*`. Existing v0.4.0 users will see a
+  re-consent prompt on auto-update because of this permission addition;
+  the Chrome Web Store re-review for v0.5.0 will need a justification
+  noting that cookie reads/writes are scoped to the inspected tab's origin
+  and are user-initiated only.
+
+### Fixed
+
+- Path scope handled correctly for cookies set/read on non-root paths
+  (e.g. `/api/admin/`). Earlier draft passed the tab URL verbatim to
+  `chrome.cookies.get` / `.remove`, which silently missed cookies whose
+  path didn't fall under the tab's pathname. The URL is now rebuilt with
+  the profile's configured path before each call. Unit-tested.
+
 ## [0.4.0] - 2026-05-30
 
 ### Added
