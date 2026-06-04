@@ -1,6 +1,6 @@
 {
   "name": "phantom-mock",
-  "version": "0.5.2",
+  "version": "0.5.3",
   "description": "Chrome extension to mock REST API URLs and intercept HTTP requests right from your browser.",
   "license": "MIT",
   "private": true,
