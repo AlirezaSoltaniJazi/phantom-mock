@@ -7,11 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.2] - 2026-05-30
+
+### Fixed
+
+- **Settings → Import was rejected with "MUTATE_STATE is restricted to
+  extension contexts".** The privileged-sender check introduced for the
+  v0.5.0 security audit used `sender.tab === undefined` to identify
+  trusted extension contexts. That assumption is wrong for Chrome MV3
+  DevTools panels — the panel reports `sender.tab` populated with the
+  inspected tab id, so every legitimate import was being mis-classified
+  as a content-script attack and rejected. Switched to a URL-prefix check
+  (`sender.url.startsWith(chrome.runtime.getURL(''))`) which correctly
+  identifies popup, options, and DevTools-panel senders regardless of
+  whether `sender.tab` is set. Cross-tab cookie spoofing protection for
+  genuine content scripts is unchanged. Regression-tested.
+
 ## [0.5.1] - 2026-05-30
 
 ### Changed
 
-- Make data be more generic
+- Replaced client-specific placeholder strings (a real product key /
+  Django cookie name / staging hostnames) with neutral generics
+  (`localStorageKey`, `app_locale`, `example.com`) in the editor
+  placeholders, store-listing copy, code comments, and test fixtures.
 
 ## [0.5.0] - 2026-05-30
 
