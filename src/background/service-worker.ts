@@ -167,13 +167,17 @@ registerLogPortListener();
 registerDnrMatchPortListener();
 registerDnrMatchListener();
 
-// `sender.tab` is undefined when the message originates from an extension
-// context (DevTools panel, popup, options page, the service worker itself).
-// It's set when the sender is a content script in a tab — those are
-// untrusted (loaded on any http(s) origin) and must NOT be allowed to ask
-// the SW to mutate state or to touch cookies on a tab other than their own.
+// Extension contexts (popup, options, DevTools panel) report sender.url
+// starting with chrome-extension://<our-id>/. Content scripts on host pages
+// report the page's http(s):// URL. We can't rely on `sender.tab === undefined`
+// here because Chrome MV3 populates sender.tab on DevTools panel messages
+// (with the INSPECTED tab id) — the panel would otherwise be mis-identified
+// as a content script and legitimate state mutations (e.g. Settings → Import)
+// would be rejected.
 export function isPrivilegedSender(sender: chrome.runtime.MessageSender): boolean {
-  return sender.tab === undefined;
+  const ourPrefix = chrome.runtime.getURL('');
+  const url = sender.url ?? sender.origin ?? '';
+  return url.startsWith(ourPrefix);
 }
 
 // Cross-tab cookie access guard. A compromised page's content script could
