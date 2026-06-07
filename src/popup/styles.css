@@ -57,7 +57,7 @@ body {
 }
 
 .pop-version {
-  font-size: calc(var(--pm-font-size) - 3px);
+  font-size: 0.6em;
   font-weight: 400;
   color: var(--fg-muted);
 }

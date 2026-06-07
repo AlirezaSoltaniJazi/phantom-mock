@@ -2,6 +2,7 @@ import { useEffect, useState, type JSX } from 'react';
 import { createRoot } from 'react-dom/client';
 import { useAppState } from './state-hook';
 import { RulesTable } from './components/RulesTable';
+import { GroupsTable } from './components/GroupsTable';
 import { RuleEditor } from './components/RuleEditor';
 import { HitLog } from './components/HitLog';
 import { DnrDebug } from './components/DnrDebug';
@@ -192,32 +193,7 @@ function App(): JSX.Element {
       <div className="pm-content">
         {tab === 'rules' ? <RulesTable state={state} onEdit={startEdit} mutate={mutate} /> : null}
         {tab === 'groups' ? (
-          <RulesTable
-            state={state}
-            onEdit={startEdit}
-            mutate={mutate}
-            renderGroupExtra={(g) => {
-              const shown = !prefs.hiddenPopupGroupIds.includes(g.id);
-              return (
-                <label className="pm-group-popup-toggle" title="Show this group on the popup">
-                  <input
-                    type="checkbox"
-                    className="pm-toggle pm-toggle-sm"
-                    checked={shown}
-                    onChange={(e) =>
-                      void setPrefs({
-                        ...prefs,
-                        hiddenPopupGroupIds: e.target.checked
-                          ? prefs.hiddenPopupGroupIds.filter((id) => id !== g.id)
-                          : [...prefs.hiddenPopupGroupIds, g.id],
-                      })
-                    }
-                  />
-                  <span>Popup</span>
-                </label>
-              );
-            }}
-          />
+          <GroupsTable state={state} mutate={mutate} prefs={prefs} setPrefs={setPrefs} />
         ) : null}
         {tab === 'editor' ? (
           <RuleEditor

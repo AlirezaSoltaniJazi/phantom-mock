@@ -131,6 +131,11 @@ function Popup(): JSX.Element {
           <div className="pop-empty">
             No rules yet. Open the DevTools panel "Phantom Mock" to create your first rule.
           </div>
+        ) : groups.length === 0 ? (
+          <div className="pop-empty">
+            No groups are shown here. Turn on the "Popup" toggle for a group in the DevTools panel
+            "Phantom Mock" (Groups tab) to display it.
+          </div>
         ) : (
           groups.map((g) => {
             const groupRules = rulesByGroup.get(g.id) ?? [];

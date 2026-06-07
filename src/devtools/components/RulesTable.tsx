@@ -7,13 +7,9 @@ interface Props {
   state: AppState;
   onEdit: (rule: Rule) => void;
   mutate: (mutation: StateMutation) => Promise<void>;
-  // Optional per-group control rendered in the group header. When omitted (the
-  // Rules tab), the output is identical to before; the Groups tab passes this
-  // to add a "show on popup" toggle without forking the component.
-  renderGroupExtra?: (group: Group) => JSX.Element;
 }
 
-export function RulesTable({ state, onEdit, mutate, renderGroupExtra }: Props): JSX.Element {
+export function RulesTable({ state, onEdit, mutate }: Props): JSX.Element {
   const groups = [...state.groups].sort((a, b) => a.order - b.order);
   const rulesByGroup = new Map<string, Rule[]>();
   for (const g of groups) rulesByGroup.set(g.id, []);
@@ -188,7 +184,6 @@ export function RulesTable({ state, onEdit, mutate, renderGroupExtra }: Props): 
               />
               <span className="pm-group-name">{g.name}</span>
               <span style={{ color: 'var(--fg-muted)', fontSize: 11 }}>{groupRules.length}</span>
-              {renderGroupExtra?.(g)}
               <button
                 className="pm-btn secondary"
                 type="button"
