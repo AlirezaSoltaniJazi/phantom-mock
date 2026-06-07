@@ -1,4 +1,4 @@
-export type UrlMatchType = 'exact' | 'contains' | 'regex';
+export type UrlMatchType = 'exact' | 'contains' | 'regex' | 'template';
 
 export const HTTP_METHODS = [
   'GET',

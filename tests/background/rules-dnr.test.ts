@@ -77,6 +77,18 @@ describe('translateToDnrRules', () => {
     }
   });
 
+  it('compiles a template match into a regexFilter', () => {
+    const rules = translateToDnrRules(
+      makeState([
+        makeHeaderRule({
+          match: { method: '*', urlMatchType: 'template', urlPattern: '/devices/{random:20}/x' },
+        }),
+      ])
+    );
+    expect(rules[0]?.condition.regexFilter).toBe('/devices/[A-Za-z0-9]{20}/x');
+    expect(rules[0]?.condition.urlFilter).toBeUndefined();
+  });
+
   it('uses regexFilter for regex match type', () => {
     const rules = translateToDnrRules(
       makeState([

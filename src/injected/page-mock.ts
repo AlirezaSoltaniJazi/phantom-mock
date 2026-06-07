@@ -1,5 +1,6 @@
 import { PAGE_MESSAGE_SOURCE, PAGE_MESSAGE_TYPES } from '@/shared/constants';
 import { buildActiveView, isRuleActive, specMatches } from '@/shared/matcher';
+import { renderRandomTokens } from '@/shared/template';
 import type { AppState, Group, MockAction, MockHit, Rule } from '@/shared/types';
 
 type RulesPayload = {
@@ -118,7 +119,9 @@ function patchFetch(): void {
     }
     const action = match.action;
     if (action.delayMs > 0) await sleep(action.delayMs);
-    const response = new Response(action.responseBody, {
+    // Generate {random}/{random:N} tokens once per response (fresh each request).
+    const body = renderRandomTokens(action.responseBody);
+    const response = new Response(body, {
       status: action.statusCode,
       headers: headersFromAction(action),
     });
@@ -185,6 +188,8 @@ function patchXhr(): void {
     const action = match.action;
     const headers = headersFromAction(action);
     const rawHeaders = rawHeaderString(headers);
+    // Generate {random}/{random:N} tokens once so every read returns the same value.
+    const mockBody = renderRandomTokens(action.responseBody);
 
     Object.defineProperty(self, 'readyState', { configurable: true, get: () => 4 });
     Object.defineProperty(self, 'status', { configurable: true, get: () => action.statusCode });
@@ -194,11 +199,11 @@ function patchXhr(): void {
     });
     Object.defineProperty(self, 'responseText', {
       configurable: true,
-      get: () => action.responseBody,
+      get: () => mockBody,
     });
     Object.defineProperty(self, 'response', {
       configurable: true,
-      get: () => action.responseBody,
+      get: () => mockBody,
     });
     Object.defineProperty(self, 'responseURL', { configurable: true, get: () => self._pm_url });
     self.getAllResponseHeaders = (): string => rawHeaders;

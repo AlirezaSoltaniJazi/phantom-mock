@@ -1,6 +1,7 @@
 import { hashStringToInt } from '@/utils/id';
 import type { AppState, HeaderOp, Rule } from '@/shared/types';
 import { buildActiveView, isRuleActive } from '@/shared/matcher';
+import { templateToRegexSource } from '@/shared/template';
 
 type DnrRule = chrome.declarativeNetRequest.Rule;
 type DnrHeaderOp = chrome.declarativeNetRequest.ModifyHeaderInfo;
@@ -95,6 +96,10 @@ function buildCondition(rule: Rule): chrome.declarativeNetRequest.RuleCondition 
       break;
     case 'regex':
       condition.regexFilter = rule.match.urlPattern;
+      break;
+    case 'template':
+      // Same {random}/{random:N} tokens, compiled to an RE2-compatible source.
+      condition.regexFilter = templateToRegexSource(rule.match.urlPattern);
       break;
   }
   return condition;

@@ -321,8 +321,16 @@ function validateMatch(value: unknown, path: string): Result<Rule['match']> {
       error: `${path}.method must be one of ${HTTP_METHODS.join(', ')}`,
     };
   }
-  if (m.urlMatchType !== 'exact' && m.urlMatchType !== 'contains' && m.urlMatchType !== 'regex') {
-    return { ok: false, error: `${path}.urlMatchType must be exact, contains, or regex` };
+  if (
+    m.urlMatchType !== 'exact' &&
+    m.urlMatchType !== 'contains' &&
+    m.urlMatchType !== 'regex' &&
+    m.urlMatchType !== 'template'
+  ) {
+    return {
+      ok: false,
+      error: `${path}.urlMatchType must be exact, contains, regex, or template`,
+    };
   }
   if (typeof m.urlPattern !== 'string') {
     return { ok: false, error: `${path}.urlPattern must be a string` };
