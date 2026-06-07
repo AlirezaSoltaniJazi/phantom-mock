@@ -75,6 +75,11 @@ jobs:
           fi
 
       - run: npm run package
+      # Also build the local/unpacked variant so each GitHub Release carries a
+      # sideloadable zip (phantom-mock-local-<version>.zip) next to the CWS one.
+      # Safe: the source is already public, the build bakes in no secrets, and
+      # the CWS publish step below uploads the production zip by exact filename.
+      - run: npm run package:local
 
       - name: Commit + tag + push (manual run only)
         if: github.event_name == 'workflow_dispatch'
