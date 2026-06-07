@@ -76,6 +76,8 @@ jobs:
 
       - run: npm run package
 
+      - run: npm run package:local
+
       - name: Commit + tag + push (manual run only)
         if: github.event_name == 'workflow_dispatch'
         run: |
