@@ -134,6 +134,15 @@ html,
   flex: 1;
 }
 
+/* "Show on popup" toggle shown only in the Groups tab (via renderGroupExtra). */
+.pm-group-popup-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--fg-muted);
+}
+
 .pm-rule {
   display: grid;
   grid-template-columns: auto auto 70px 80px 1fr auto;

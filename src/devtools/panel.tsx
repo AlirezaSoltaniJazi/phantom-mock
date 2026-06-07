@@ -21,6 +21,7 @@ import './styles.css';
 
 type Tab =
   | 'rules'
+  | 'groups'
   | 'editor'
   | 'storage'
   | 'storage-editor'
@@ -94,6 +95,13 @@ function App(): JSX.Element {
           onClick={() => setTab('rules')}
         >
           Rules
+        </button>
+        <button
+          type="button"
+          className={`pm-tab ${tab === 'groups' ? 'is-active' : ''}`}
+          onClick={() => setTab('groups')}
+        >
+          Groups
         </button>
         <button
           type="button"
@@ -183,6 +191,34 @@ function App(): JSX.Element {
       </div>
       <div className="pm-content">
         {tab === 'rules' ? <RulesTable state={state} onEdit={startEdit} mutate={mutate} /> : null}
+        {tab === 'groups' ? (
+          <RulesTable
+            state={state}
+            onEdit={startEdit}
+            mutate={mutate}
+            renderGroupExtra={(g) => {
+              const shown = !prefs.hiddenPopupGroupIds.includes(g.id);
+              return (
+                <label className="pm-group-popup-toggle" title="Show this group on the popup">
+                  <input
+                    type="checkbox"
+                    className="pm-toggle pm-toggle-sm"
+                    checked={shown}
+                    onChange={(e) =>
+                      void setPrefs({
+                        ...prefs,
+                        hiddenPopupGroupIds: e.target.checked
+                          ? prefs.hiddenPopupGroupIds.filter((id) => id !== g.id)
+                          : [...prefs.hiddenPopupGroupIds, g.id],
+                      })
+                    }
+                  />
+                  <span>Popup</span>
+                </label>
+              );
+            }}
+          />
+        ) : null}
         {tab === 'editor' ? (
           <RuleEditor
             key={editing?.id ?? 'new'}

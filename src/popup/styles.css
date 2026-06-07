@@ -56,6 +56,12 @@ body {
   flex: 1;
 }
 
+.pop-version {
+  font-size: calc(var(--pm-font-size) - 3px);
+  font-weight: 400;
+  color: var(--fg-muted);
+}
+
 .pop-master {
   display: inline-flex;
   align-items: center;

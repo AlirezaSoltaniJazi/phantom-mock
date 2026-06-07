@@ -47,12 +47,16 @@ function sanitize(value: unknown): UIPreferences {
     typeof v.autoReloadOnStorageSwitch === 'boolean'
       ? v.autoReloadOnStorageSwitch
       : DEFAULT_UI_PREFERENCES.autoReloadOnStorageSwitch;
+  const hiddenPopupGroupIds = Array.isArray(v.hiddenPopupGroupIds)
+    ? v.hiddenPopupGroupIds.filter((x): x is string => typeof x === 'string')
+    : [...DEFAULT_UI_PREFERENCES.hiddenPopupGroupIds];
   return {
     fontSizeMode,
     fontSizeCustomPx,
     showToast,
     captureColumns,
     autoReloadOnStorageSwitch,
+    hiddenPopupGroupIds,
   };
 }
 

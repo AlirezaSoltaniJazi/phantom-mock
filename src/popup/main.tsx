@@ -16,7 +16,7 @@ function Popup(): JSX.Element {
   const [state, setState] = useState<AppState | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(() => new Set());
-  const { fontSizePx } = usePrefs();
+  const { prefs, fontSizePx } = usePrefs();
 
   useEffect(() => {
     applyFontSizeVar(document.documentElement, fontSizePx);
@@ -79,7 +79,9 @@ function Popup(): JSX.Element {
     );
   if (!state) return <div className="pop-empty">Loading…</div>;
 
-  const groups = [...state.groups].sort((a, b) => a.order - b.order);
+  const groups = [...state.groups]
+    .filter((g) => !prefs.hiddenPopupGroupIds.includes(g.id))
+    .sort((a, b) => a.order - b.order);
   const rulesByGroup = new Map<string, Rule[]>();
   for (const g of groups) rulesByGroup.set(g.id, []);
   for (const r of state.rules) {
@@ -91,7 +93,9 @@ function Popup(): JSX.Element {
   return (
     <div className="pop">
       <div className="pop-header">
-        <span className="pop-title">Phantom Mock</span>
+        <span className="pop-title">
+          Phantom Mock <span className="pop-version">v{chrome.runtime.getManifest().version}</span>
+        </span>
         <label
           className="pop-master"
           title={
