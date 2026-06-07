@@ -7,6 +7,53 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-06-07
+
+### Added
+
+- **Dynamic URL matching with `{random}` placeholders** — a new **Template**
+  URL match type. `{random}` matches any value within a path segment and
+  `{random:N}` matches exactly N random alphanumeric characters, so a single
+  rule covers dynamic ids (e.g. `/devices/{random}/details` matches every
+  device). The **same tokens in a mock response body generate a fresh random
+  value on every request** — a body of `{"id":"{random:20}"}` returns a new
+  20-character id each call. Templates compile to a regex internally and work
+  for both mock rules and header (declarativeNetRequest) rules.
+- **Groups tab** — a dedicated DevTools panel tab for managing rule groups
+  (create, rename, delete, enable/disable) at a glance, without the rules
+  listed inside each group. Each group has a **"Popup" toggle** that controls
+  whether it appears on the browser-action popup — a local-only display
+  preference, independent of the group's `enabled` state and not part of
+  export/import.
+- **Version display** — the popup header now reads `Phantom Mock vX.Y.Z` (the
+  version in a smaller, muted font) and Settings gained an **About** section.
+  Both read the version from the manifest at runtime.
+- **Readable captured bodies** — request/response bodies in the Capture tab
+  render JSON as a collapsible, colour-coded tree (the same viewer used by the
+  rule editor); non-JSON bodies fall back to raw text.
+
+### Changed
+
+- **The Release workflow now publishes two artifacts** per GitHub Release: the
+  production Chrome Web Store zip and a `-local` unpacked/sideload zip (named
+  "Phantom Mock - Local", with sourcemaps).
+- The popup shows a short guidance message when every group is hidden from it,
+  instead of an empty body.
+
+### Fixed
+
+- **Header overrides now apply to every request type** — scripts, stylesheets,
+  images, fonts, media and more, not just navigations and XHR/fetch.
+  Previously a sub-resource fetched via `<script>` (such as a Django admin's
+  `jsi18n` catalogue) reached the server **without** the injected header; on a
+  multi-tenant backend that resolves context from a header (e.g.
+  `X-Tenant-ID`) the missing header dropped that request into the wrong tenant
+  and silently logged the user out. The resource-type list is derived from the
+  live DNR enum so only types the running Chrome recognises are ever sent.
+- The **auto-assign-author** GitHub Action no longer fails on Dependabot (bot)
+  pull requests — it skips bot authors, so dependency PRs no longer carry a
+  red ✗.
+
 ## [0.5.2] - 2026-05-30
 
 ### Fixed
