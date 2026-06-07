@@ -1,6 +1,7 @@
 import { hashStringToInt } from '@/utils/id';
 import type { AppState, HeaderOp, Rule } from '@/shared/types';
 import { buildActiveView, isRuleActive } from '@/shared/matcher';
+import { templateToRegexSource } from '@/shared/template';
 
 type DnrRule = chrome.declarativeNetRequest.Rule;
 type DnrHeaderOp = chrome.declarativeNetRequest.ModifyHeaderInfo;
@@ -11,17 +12,42 @@ const HEADER_OP_MAP: Record<HeaderOp['op'], chrome.declarativeNetRequest.HeaderO
   remove: chrome.declarativeNetRequest?.HeaderOperation?.REMOVE ?? ('remove' as never),
 };
 
-// Header rules apply to anything DNR can see: XHR/fetch (the original REST
-// scope), plus page navigations and iframe loads (so X-Tenant-ID / Auth /
-// etc. headers can be injected when the user clicks a link or opens a tab).
-// Mock rules — which are NOT done through DNR — still operate only on fetch
-// and XHR; that's a property of the page-world patcher in src/injected/.
+// Header rules apply to EVERY resource type DNR can see — not just XHR/fetch
+// and navigations, but scripts, stylesheets, images, fonts, media, etc. A
+// header (X-Tenant-ID, Auth, …) has to be injected consistently: if even one
+// sub-resource slips through without it, a backend that resolves context from
+// that header lands the request in the wrong context, which can invalidate the
+// session. (Real case: a Django admin's `<script src="/api/admin/jsi18n/">`
+// was fetched without X-Tenant-ID — resource type "script", which the old list
+// omitted — and the server flushed the session, logging the user out.)
+//
+// We derive the list from the live enum so we only ever send resource-type
+// strings THIS Chrome recognises; an unknown string makes updateDynamicRules
+// reject the whole batch and silently drop ALL header rules. The static
+// fallback (used only when the enum is absent, e.g. tests) is the long-stable
+// subset of types.
+//
+// Mock rules — NOT done through DNR — still operate only on fetch/XHR; that's a
+// property of the page-world patcher in src/injected/.
 const RT = chrome.declarativeNetRequest?.ResourceType;
-const RESOURCE_TYPES: chrome.declarativeNetRequest.ResourceType[] = [
-  RT?.XMLHTTPREQUEST ?? ('xmlhttprequest' as never),
-  RT?.MAIN_FRAME ?? ('main_frame' as never),
-  RT?.SUB_FRAME ?? ('sub_frame' as never),
-];
+const RESOURCE_TYPE_STRINGS: string[] = RT
+  ? Object.values(RT)
+  : [
+      'main_frame',
+      'sub_frame',
+      'stylesheet',
+      'script',
+      'image',
+      'font',
+      'object',
+      'xmlhttprequest',
+      'ping',
+      'csp_report',
+      'media',
+      'websocket',
+      'other',
+    ];
+const RESOURCE_TYPES = RESOURCE_TYPE_STRINGS as chrome.declarativeNetRequest.ResourceType[];
 
 /**
  * DNR rule IDs must be positive integers (>= 1) and fit in a 32-bit signed
@@ -70,6 +96,10 @@ function buildCondition(rule: Rule): chrome.declarativeNetRequest.RuleCondition 
       break;
     case 'regex':
       condition.regexFilter = rule.match.urlPattern;
+      break;
+    case 'template':
+      // Same {random}/{random:N} tokens, compiled to an RE2-compatible source.
+      condition.regexFilter = templateToRegexSource(rule.match.urlPattern);
       break;
   }
   return condition;

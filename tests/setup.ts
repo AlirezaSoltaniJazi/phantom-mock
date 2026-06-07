@@ -35,6 +35,7 @@ export function createChromeMock() {
       onConnect: makeEvent<[chrome.runtime.Port]>(),
       lastError: undefined as { message: string } | undefined,
       getURL: vi.fn((path: string) => `chrome-extension://test/${path}`),
+      getManifest: vi.fn(() => ({ name: 'Phantom Mock', version: '0.0.0-test' })),
     },
     storage: {
       local: {
@@ -71,7 +72,21 @@ export function createChromeMock() {
         HEAD: 'head',
         OPTIONS: 'options',
       },
-      ResourceType: { XMLHTTPREQUEST: 'xmlhttprequest' },
+      ResourceType: {
+        MAIN_FRAME: 'main_frame',
+        SUB_FRAME: 'sub_frame',
+        STYLESHEET: 'stylesheet',
+        SCRIPT: 'script',
+        IMAGE: 'image',
+        FONT: 'font',
+        OBJECT: 'object',
+        XMLHTTPREQUEST: 'xmlhttprequest',
+        PING: 'ping',
+        CSP_REPORT: 'csp_report',
+        MEDIA: 'media',
+        WEBSOCKET: 'websocket',
+        OTHER: 'other',
+      },
       RuleActionType: { MODIFY_HEADERS: 'modifyHeaders' },
     },
     devtools: {

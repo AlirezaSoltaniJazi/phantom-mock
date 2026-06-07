@@ -1,4 +1,4 @@
-export type UrlMatchType = 'exact' | 'contains' | 'regex';
+export type UrlMatchType = 'exact' | 'contains' | 'regex' | 'template';
 
 export const HTTP_METHODS = [
   'GET',
@@ -160,6 +160,10 @@ export interface UIPreferences {
   showToast: boolean;
   captureColumns: Record<CaptureColumn, boolean>;
   autoReloadOnStorageSwitch: boolean;
+  // Group ids hidden from the browser-action popup (opt-out, so new groups are
+  // visible by default). UI-only preference — does NOT affect whether a group's
+  // rules apply (that's Group.enabled) and is NOT part of rules export/import.
+  hiddenPopupGroupIds: string[];
 }
 
 export const DEFAULT_CAPTURE_COLUMNS: Record<CaptureColumn, boolean> = {
@@ -177,6 +181,7 @@ export const DEFAULT_UI_PREFERENCES: UIPreferences = {
   showToast: true,
   captureColumns: { ...DEFAULT_CAPTURE_COLUMNS },
   autoReloadOnStorageSwitch: false,
+  hiddenPopupGroupIds: [],
 };
 
 export const FONT_SIZE_PX: Record<Exclude<FontSizeMode, 'custom'>, number> = {

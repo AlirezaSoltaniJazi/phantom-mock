@@ -23,7 +23,7 @@ interface Props {
   onCreateGroup: (name: string) => Promise<Group>;
 }
 
-const URL_MATCH_TYPES: UrlMatchType[] = ['exact', 'contains', 'regex'];
+const URL_MATCH_TYPES: UrlMatchType[] = ['exact', 'contains', 'regex', 'template'];
 
 function emptyMock(): MockAction {
   return {
@@ -261,6 +261,13 @@ export function RuleEditor({
             }
           />
           {regexError ? <div className="pm-error">{regexError}</div> : null}
+          {draft.match.urlMatchType === 'template' ? (
+            <div style={{ color: 'var(--fg-muted)', fontSize: 12, marginTop: 4 }}>
+              Use <code>{'{random}'}</code> to accept any value, or <code>{'{random:20}'}</code> for
+              N random letters/digits — e.g. <code>/devices/{'{random}'}/details</code>. The same
+              tokens in the response body generate a fresh random value each request.
+            </div>
+          ) : null}
         </div>
         <div className="pm-field">
           <label>Test against URL</label>

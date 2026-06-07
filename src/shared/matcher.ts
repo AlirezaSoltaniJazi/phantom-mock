@@ -1,4 +1,5 @@
 import type { AppState, Group, HttpMethod, MatchSpec, Rule } from './types';
+import { compileTemplate } from './template';
 
 export function compileRegex(pattern: string): RegExp | null {
   try {
@@ -21,6 +22,10 @@ export function urlMatches(spec: MatchSpec, url: string): boolean {
       return spec.urlPattern.length > 0 && url.includes(spec.urlPattern);
     case 'regex': {
       const re = compileRegex(spec.urlPattern);
+      return re !== null && re.test(url);
+    }
+    case 'template': {
+      const re = compileTemplate(spec.urlPattern);
       return re !== null && re.test(url);
     }
     default:

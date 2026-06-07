@@ -56,6 +56,39 @@ describe('translateToDnrRules', () => {
     expect(r?.condition.resourceTypes).toBeDefined();
   });
 
+  it('injects on all resource types (incl. script/style/image), not just document/XHR', () => {
+    // Regression: header rules used to cover only xmlhttprequest/main_frame/
+    // sub_frame, so a `<script>`-loaded sub-resource (e.g. a Django admin's
+    // /api/admin/jsi18n/) reached the server WITHOUT the injected header. On a
+    // backend that resolves context from that header (X-Tenant-ID), the missing
+    // header dropped the request into the wrong tenant and broke the session.
+    const rules = translateToDnrRules(makeState([makeHeaderRule()]));
+    const types = rules[0]?.condition.resourceTypes ?? [];
+    for (const t of [
+      'main_frame',
+      'sub_frame',
+      'xmlhttprequest',
+      'script',
+      'stylesheet',
+      'image',
+      'font',
+    ]) {
+      expect(types).toContain(t);
+    }
+  });
+
+  it('compiles a template match into a regexFilter', () => {
+    const rules = translateToDnrRules(
+      makeState([
+        makeHeaderRule({
+          match: { method: '*', urlMatchType: 'template', urlPattern: '/devices/{random:20}/x' },
+        }),
+      ])
+    );
+    expect(rules[0]?.condition.regexFilter).toBe('/devices/[A-Za-z0-9]{20}/x');
+    expect(rules[0]?.condition.urlFilter).toBeUndefined();
+  });
+
   it('uses regexFilter for regex match type', () => {
     const rules = translateToDnrRules(
       makeState([
