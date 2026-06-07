@@ -39,7 +39,27 @@ export function Settings({ state, mutate, prefs, setPrefs }: Props): JSX.Element
       <Notifications prefs={prefs} setPrefs={setPrefs} />
       <ExportPanel state={state} />
       <ImportPanel state={state} mutate={mutate} />
+      <About />
     </div>
+  );
+}
+
+function About(): JSX.Element {
+  // The extension reads its own version from the manifest at runtime — no
+  // build-time injection needed. The name also reveals which build is loaded:
+  // "Phantom Mock" (store/packed) vs "Phantom Mock - Local" (unpacked dev build).
+  const manifest = chrome.runtime?.getManifest?.();
+  const name = manifest?.name ?? 'Phantom Mock';
+  const version = manifest?.version ?? 'unknown';
+  return (
+    <fieldset className="pm-fieldset">
+      <legend>About</legend>
+      <div className="pm-field">
+        <span style={{ color: 'var(--fg-muted)' }}>
+          {name} · v{version}
+        </span>
+      </div>
+    </fieldset>
   );
 }
 
