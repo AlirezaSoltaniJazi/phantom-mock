@@ -7,6 +7,10 @@ on:
 jobs:
   assign-author:
     name: Assign PR Author
+    # Bot PRs (e.g. Dependabot) can't have their author assigned — GitHub
+    # rejects assigning a bot and the job fails, leaving a red ✗ on every
+    # dependency PR. Skip bots so their PRs stay green.
+    if: ${{ github.event.pull_request.user.type != 'Bot' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
