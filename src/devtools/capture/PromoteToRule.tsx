@@ -9,6 +9,7 @@ import {
 } from '@/shared/types';
 import { DEFAULT_GROUP_ID } from '@/shared/constants';
 import { newId } from '@/utils/id';
+import { BodyPreview } from '@/devtools/components/BodyPreview';
 import { approxBodySize, type CapturedEntry, type CapturedHeader } from './types';
 
 type RuleKind = 'mock' | 'header';
@@ -327,15 +328,15 @@ export function PromoteToRule({
         <legend>Captured request (read-only)</legend>
         <details>
           <summary>Request body ({approxBodySize(entry.requestBody)})</summary>
-          <pre className="pm-pre">{entry.requestBody ?? '(none)'}</pre>
+          <BodyPreview body={entry.requestBody} />
         </details>
         <details>
           <summary>Response body ({approxBodySize(entry.responseBody)})</summary>
-          <pre className="pm-pre">
-            {entry.responseEncoding === 'base64'
-              ? '(binary, base64 encoded — not previewed)'
-              : (entry.responseBody ?? '(none)')}
-          </pre>
+          {entry.responseEncoding === 'base64' ? (
+            <pre className="pm-pre">(binary, base64 encoded — not previewed)</pre>
+          ) : (
+            <BodyPreview body={entry.responseBody} />
+          )}
         </details>
       </fieldset>
 
