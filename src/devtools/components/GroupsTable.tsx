@@ -1,6 +1,8 @@
+import { useState } from 'react';
 import type { JSX } from 'react';
 import type { AppState, Group, UIPreferences } from '@/shared/types';
 import type { StateMutation } from '@/shared/messages';
+import { moveItem } from '@/shared/groups';
 import { newId } from '@/utils/id';
 
 interface Props {
@@ -19,6 +21,30 @@ export function GroupsTable({ state, mutate, prefs, setPrefs }: Props): JSX.Elem
   const ruleCount = new Map<string, number>();
   for (const g of groups) ruleCount.set(g.id, 0);
   for (const r of state.rules) ruleCount.set(r.groupId, (ruleCount.get(r.groupId) ?? 0) + 1);
+
+  // Drag-to-reorder state. `dragIndex` is the row being dragged, `overIndex` the
+  // row currently hovered as a drop target — both indices into the sorted list.
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const [overIndex, setOverIndex] = useState<number | null>(null);
+
+  function resetDrag(): void {
+    setDragIndex(null);
+    setOverIndex(null);
+  }
+
+  function handleDrop(targetIndex: number): void {
+    if (dragIndex === null || dragIndex === targetIndex) {
+      resetDrag();
+      return;
+    }
+    const orderedIds = moveItem(
+      groups.map((g) => g.id),
+      dragIndex,
+      targetIndex
+    );
+    resetDrag();
+    void mutate({ kind: 'reorderGroups', orderedIds });
+  }
 
   function addGroup(): void {
     const name = window.prompt('Group name');
@@ -44,11 +70,45 @@ export function GroupsTable({ state, mutate, prefs, setPrefs }: Props): JSX.Elem
         </button>
       </div>
 
-      {groups.map((g) => {
+      {groups.map((g, i) => {
         const shown = !prefs.hiddenPopupGroupIds.includes(g.id);
+        const isDragging = dragIndex === i;
+        const isDropTarget = dragIndex !== null && dragIndex !== i && overIndex === i;
+        const className =
+          'pm-group' +
+          (isDragging ? ' pm-group-dragging' : '') +
+          (isDropTarget ? ' pm-group-dragover' : '');
         return (
-          <div className="pm-group" key={g.id}>
+          <div
+            className={className}
+            key={g.id}
+            onDragOver={(e) => {
+              if (dragIndex === null) return;
+              e.preventDefault();
+              e.dataTransfer.dropEffect = 'move';
+              if (overIndex !== i) setOverIndex(i);
+            }}
+            onDrop={(e) => {
+              e.preventDefault();
+              handleDrop(i);
+            }}
+          >
             <div className="pm-group-header">
+              <span
+                className="pm-drag-handle"
+                role="button"
+                aria-label={`Drag to reorder group ${g.name}`}
+                title="Drag to reorder"
+                draggable
+                onDragStart={(e) => {
+                  setDragIndex(i);
+                  e.dataTransfer.effectAllowed = 'move';
+                  e.dataTransfer.setData('text/plain', g.id);
+                }}
+                onDragEnd={resetDrag}
+              >
+                ⠿
+              </span>
               <input
                 type="checkbox"
                 className="pm-toggle pm-toggle-sm"

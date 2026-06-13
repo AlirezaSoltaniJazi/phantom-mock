@@ -10,14 +10,7 @@
   --danger: #c33;
   --warning: #c80;
   --ok: #2a8;
-  font-family:
-    -apple-system,
-    BlinkMacSystemFont,
-    'Segoe UI',
-    Roboto,
-    Helvetica,
-    Arial,
-    sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   --pm-font-size: 14px;
   font-size: var(--pm-font-size);
 }
@@ -132,6 +125,30 @@ html,
 .pm-group-name {
   font-weight: 600;
   flex: 1;
+}
+
+/* Grip affordance for drag-to-reorder in the Groups tab. */
+.pm-drag-handle {
+  cursor: grab;
+  user-select: none;
+  color: var(--fg-muted);
+  font-size: 14px;
+  line-height: 1;
+  padding: 0 2px;
+}
+
+.pm-drag-handle:active {
+  cursor: grabbing;
+}
+
+.pm-group-dragging {
+  opacity: 0.5;
+}
+
+/* Drop-target indicator: highlighted border + insertion accent on the hovered row. */
+.pm-group-dragover {
+  border-color: var(--accent);
+  box-shadow: inset 0 2px 0 var(--accent);
 }
 
 /* "Show on popup" toggle shown only in the Groups tab (via renderGroupExtra). */
