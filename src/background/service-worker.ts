@@ -1,6 +1,7 @@
 import { MESSAGE_TYPES } from '@/shared/constants';
 import { isRuntimeMessage, type RuntimeMessage, type StateMutation } from '@/shared/messages';
 import { CURRENT_SCHEMA_VERSION, type AppState } from '@/shared/types';
+import { reorderGroups } from '@/shared/groups';
 import { defaultState, getState, setState, subscribe, updateState } from './storage';
 import { syncDnrRules, translateToDnrRules } from './rules-dnr';
 import { clearHits, getHits, recordHit, registerLogPortListener } from './log';
@@ -60,6 +61,10 @@ function applyMutation(state: AppState, mutation: StateMutation): AppState {
       const groups = state.groups.map((g) =>
         g.id === mutation.groupId ? { ...g, enabled: mutation.enabled } : g
       );
+      return { ...state, groups };
+    }
+    case 'reorderGroups': {
+      const groups = reorderGroups(state.groups, mutation.orderedIds);
       return { ...state, groups };
     }
     case 'upsertRule': {

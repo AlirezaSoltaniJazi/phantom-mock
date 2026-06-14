@@ -10,14 +10,7 @@
   --danger: #c33;
   --warning: #c80;
   --ok: #2a8;
-  font-family:
-    -apple-system,
-    BlinkMacSystemFont,
-    'Segoe UI',
-    Roboto,
-    Helvetica,
-    Arial,
-    sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   --pm-font-size: 14px;
   font-size: var(--pm-font-size);
 }
@@ -54,13 +47,18 @@ html,
 
 .pm-tabs {
   display: flex;
+  /* Wrap onto multiple rows on narrow panels so all tabs stay visible and the
+     strip never forces the whole panel into a horizontal scroll. */
+  flex-wrap: wrap;
   gap: 4px;
-  padding: 8px 12px 0;
+  padding: 8px 12px;
   border-bottom: 1px solid var(--border);
   background: var(--bg-alt);
 }
 
 .pm-tab {
+  flex: 0 0 auto;
+  white-space: nowrap;
   background: transparent;
   border: none;
   padding: 8px 14px;
@@ -78,6 +76,10 @@ html,
 
 .pm-content {
   flex: 1;
+  /* min-width:0 lets this flex child shrink to the panel instead of being
+     widened by long, unbreakable content — wide content scrolls inside here
+     rather than pushing the whole panel sideways. */
+  min-width: 0;
   overflow: auto;
   padding: 16px;
 }
@@ -132,6 +134,50 @@ html,
 .pm-group-name {
   font-weight: 600;
   flex: 1;
+}
+
+/* Grip affordance for drag-to-reorder in the Groups tab. */
+.pm-drag-handle {
+  cursor: grab;
+  user-select: none;
+  color: var(--fg-muted);
+  font-size: 14px;
+  line-height: 1;
+  padding: 0 2px;
+}
+
+.pm-drag-handle:active {
+  cursor: grabbing;
+}
+
+.pm-group-dragging {
+  opacity: 0.5;
+}
+
+/* Drop-target indicator: highlighted border + insertion accent on the hovered row. */
+.pm-group-dragover {
+  border-color: var(--accent);
+  box-shadow: inset 0 2px 0 var(--accent);
+}
+
+/* Chip marking a group that only activates when the request URL matches. */
+.pm-group-cond-chip {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  border-radius: 3px;
+  padding: 1px 5px;
+  white-space: nowrap;
+}
+
+/* Inline activation-condition editor expanded under a group header. */
+.pm-group-condition {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
 }
 
 /* "Show on popup" toggle shown only in the Groups tab (via renderGroupExtra). */

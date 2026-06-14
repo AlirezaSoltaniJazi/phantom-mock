@@ -1,15 +1,9 @@
 import { CURRENT_SCHEMA_VERSION, type AppState } from '@/shared/types';
-import { DEFAULT_GROUP_ID, DEFAULT_GROUP_NAME, STORAGE_KEYS } from '@/shared/constants';
+import { STORAGE_KEYS } from '@/shared/constants';
+import { defaultAppState } from '@/shared/default-state';
 
 export function defaultState(): AppState {
-  return {
-    schemaVersion: CURRENT_SCHEMA_VERSION,
-    masterEnabled: true,
-    groups: [{ id: DEFAULT_GROUP_ID, name: DEFAULT_GROUP_NAME, enabled: true, order: 0 }],
-    rules: [],
-    storageProfiles: [],
-    cookieProfiles: [],
-  };
+  return defaultAppState();
 }
 
 export async function getState(): Promise<AppState> {

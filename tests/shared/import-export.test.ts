@@ -73,6 +73,42 @@ describe('buildExportBundle / parseExportBundle', () => {
   });
 });
 
+describe('group activation conditions', () => {
+  it('round-trips a group pageUrlContains condition', () => {
+    const state: AppState = {
+      ...baseState,
+      groups: [{ ...baseGroup, activation: { pageUrlContains: '/v2/' } }],
+    };
+    const parsed = parseExportBundle(JSON.stringify(buildExportBundle(state)));
+    expect(parsed.ok).toBe(true);
+    if (parsed.ok) {
+      expect(parsed.value.groups[0]?.activation).toEqual({ pageUrlContains: '/v2/' });
+    }
+  });
+
+  it('drops an empty pageUrlContains condition on import', () => {
+    const bundle = JSON.parse(JSON.stringify(buildExportBundle(baseState)));
+    bundle.groups[0].activation = { pageUrlContains: '' };
+    const parsed = parseExportBundle(JSON.stringify(bundle));
+    expect(parsed.ok).toBe(true);
+    if (parsed.ok) expect(parsed.value.groups[0]?.activation).toBeUndefined();
+  });
+
+  it('rejects a non-string pageUrlContains', () => {
+    const bundle = JSON.parse(JSON.stringify(buildExportBundle(baseState)));
+    bundle.groups[0].activation = { pageUrlContains: 123 };
+    const parsed = parseExportBundle(JSON.stringify(bundle));
+    expect(parsed.ok).toBe(false);
+    if (!parsed.ok) expect(parsed.error).toContain('pageUrlContains');
+  });
+
+  it('imports an old bundle that has no activation field', () => {
+    const parsed = parseExportBundle(JSON.stringify(buildExportBundle(baseState)));
+    expect(parsed.ok).toBe(true);
+    if (parsed.ok) expect(parsed.value.groups[0]?.activation).toBeUndefined();
+  });
+});
+
 describe('applyImport', () => {
   it('replace strategy substitutes groups + rules but keeps masterEnabled', () => {
     const incoming = buildExportBundle({

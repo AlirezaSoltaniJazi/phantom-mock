@@ -54,11 +54,24 @@ export interface Rule {
   action: RuleAction;
 }
 
+// Optional, additive activation gate for a group. When present, the group's
+// rules only apply while the current PAGE (tab) URL satisfies the condition;
+// when absent (or empty), the group is always active while enabled (the
+// original behavior). This is the address-bar URL, not the per-request endpoint
+// URL — e.g. open `…/overview/therapy-details` and a group gated on
+// `overview/therapy-details` mocks every endpoint that page calls.
+export interface GroupActivation {
+  // Active only when `window.location.href` contains this substring.
+  pageUrlContains?: string;
+}
+
 export interface Group {
   id: string;
   name: string;
   enabled: boolean;
   order: number;
+  // Omit the key entirely when there is no condition (exactOptionalPropertyTypes).
+  activation?: GroupActivation;
 }
 
 export interface StorageProfile {

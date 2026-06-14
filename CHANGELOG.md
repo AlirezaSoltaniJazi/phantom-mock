@@ -5,7 +5,69 @@ All notable changes to Phantom Mock are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.7.0] - 2026-06-14
+
+### Added
+
+- **Drag-and-drop group reordering** in the **Groups** tab. Each group row has a
+  grip handle (`⠿`); drag a group to reorder it and the new order is reflected
+  everywhere groups are listed (Groups tab, Rules tab, and the popup). Backed by
+  a new `reorderGroups` state mutation; order persists in `chrome.storage.local`.
+  Unit-tested (`moveItem` / `reorderGroups` in `src/shared/groups.ts`).
+- **Per-group page-URL activation conditions.** A group can be set (Groups tab →
+  **Condition**) to activate only while the current **page (tab) URL** contains a
+  given substring — e.g. a group gated on `overview/therapy-details` mocks every
+  endpoint that page calls and stays off on other routes. Evaluated in the page
+  world against `window.location.href`, so SPA client-side navigation is honoured
+  without a reload. The condition round-trips through **Settings → Export /
+  Import**; pre-existing bundles without it still import. _Note:_
+  header-modification (declarativeNetRequest) rules can't see the initiating
+  page's URL path (a Chrome DNR limitation) and are therefore not page-scoped.
+- **Settings → Danger zone → "Reset all data".** A single, confirmation-guarded
+  action that deletes every rule, group, storage profile, and cookie profile
+  (back to one empty **Default** group) and clears the Hit Log and DNR match log.
+  Appearance & notification preferences are intentionally kept. The pristine
+  state now lives in one shared `defaultAppState()` reused by both first-run
+  seeding and reset.
+
+### Changed
+
+- **In-page toasts now identify their group.** Every "rule applied" toast is
+  tagged with the owning group's name, and a mock fired from a page-conditional
+  group additionally shows a distinct purple **"group active: &lt;group&gt;"**
+  toast on every such request — so it's always obvious which conditional group is
+  live. Both honour the existing **Show toast** preference.
+- **Tab bar wraps on narrow panels.** With many tabs, a side-docked DevTools
+  panel used to drag the whole panel into a horizontal scroll; the tab strip now
+  wraps onto multiple rows and the content always fits the panel width (a long,
+  unbreakable rule URL scrolls inside the content area instead of widening the
+  panel).
+- **Export filenames now include the time** —
+  `phantom-mock-rules-YYYYMMDD-HHMMSS.json` instead of date-only — so exporting
+  more than once a day no longer collides into a browser `… (1).json` duplicate.
+- **Routine dependency updates** — `eslint` 10.4 → 10.5, `@typescript-eslint/*`
+  8.60 → 8.61, `happy-dom` 20.9 → 20.10, `prettier` 3.8.3 → 3.8.4, and
+  `@types/chrome` / `@types/node` patches.
+
+### Fixed
+
+- **"Extension context invalidated" console error** from orphaned content
+  scripts. After the extension is reloaded, updated, or disabled, an
+  already-injected content script keeps receiving page-world hits and its
+  `chrome.runtime.sendMessage` threw **synchronously** — which a trailing
+  `.catch()` cannot swallow — surfacing as an uncaught error on every mocked
+  request. Runtime messaging is now guarded (`chrome.runtime?.id` check plus
+  try/catch in `src/content/runtime.ts`), so orphaned tabs stay silent until
+  refreshed. Regression-tested.
+
+### Security
+
+- **`@crxjs/vite-plugin` upgraded 2.4.0 → 2.6.1**, pinning the patched
+  `rollup@2.80.0` and clearing the only `npm audit` finding —
+  **GHSA-mw96-cpmx-2vgc / CVE-2026-27606** (Rollup arbitrary file write via path
+  traversal, HIGH), previously pulled in transitively via `rollup@2.79.2`. This
+  is a build-time-only dev dependency (no shipped-artifact exposure), but it is
+  now remediated and `npm audit` is clean.
 
 ## [0.6.0] - 2026-06-07
 

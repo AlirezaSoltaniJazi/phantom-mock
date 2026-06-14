@@ -81,6 +81,11 @@ function methodToDnr(
   return mapped ? [mapped] : undefined;
 }
 
+// Header rules are matched by Chrome's DNR engine, which can only see the
+// request's own URL/method/resource-type and the initiator DOMAIN — never the
+// initiating page's URL PATH. So a group's `pageUrlContains` activation cannot
+// be honored here; header rules apply whenever enabled (the page-URL gate only
+// governs mock rules, enforced in the page world). See GroupsTable's note.
 function buildCondition(rule: Rule): chrome.declarativeNetRequest.RuleCondition {
   const condition: chrome.declarativeNetRequest.RuleCondition = {
     resourceTypes: RESOURCE_TYPES,

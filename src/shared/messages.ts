@@ -5,6 +5,7 @@ export type StateMutation =
   | { kind: 'upsertGroup'; group: import('./types').Group }
   | { kind: 'deleteGroup'; groupId: string }
   | { kind: 'toggleGroup'; groupId: string; enabled: boolean }
+  | { kind: 'reorderGroups'; orderedIds: string[] }
   | { kind: 'upsertRule'; rule: import('./types').Rule }
   | { kind: 'deleteRule'; ruleId: string }
   | { kind: 'toggleRule'; ruleId: string; enabled: boolean }

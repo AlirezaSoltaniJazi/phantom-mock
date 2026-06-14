@@ -2,12 +2,13 @@ import { describe, expect, it } from 'vitest';
 import {
   buildActiveView,
   findFirstMockMatch,
+  isGroupActive,
   isRuleActive,
   methodMatches,
   specMatches,
   urlMatches,
 } from '@/shared/matcher';
-import { CURRENT_SCHEMA_VERSION, type AppState, type Rule } from '@/shared/types';
+import { CURRENT_SCHEMA_VERSION, type AppState, type Group, type Rule } from '@/shared/types';
 import { DEFAULT_GROUP_ID } from '@/shared/constants';
 
 function makeMockRule(overrides: Partial<Rule> = {}): Rule {
@@ -126,7 +127,55 @@ describe('isRuleActive', () => {
   });
 });
 
+describe('isGroupActive', () => {
+  const base: Group = { id: 'g', name: 'G', enabled: true, order: 0 };
+  const page = 'https://app.example.com/patients/6/overview/therapy-details';
+
+  it('is active when the group has no activation condition', () => {
+    expect(isGroupActive(base, page)).toBe(true);
+  });
+
+  it('treats an empty pageUrlContains as no condition', () => {
+    expect(isGroupActive({ ...base, activation: { pageUrlContains: '' } }, page)).toBe(true);
+  });
+
+  it('activates only when the PAGE URL contains the substring', () => {
+    const g: Group = { ...base, activation: { pageUrlContains: 'overview/therapy-details' } };
+    expect(isGroupActive(g, page)).toBe(true);
+    expect(isGroupActive(g, 'https://app.example.com/patients/6/overview/summary')).toBe(false);
+  });
+});
+
 describe('findFirstMockMatch', () => {
+  it('gates on the PAGE url (4th arg), independent of the request url', () => {
+    const rule = makeMockRule();
+    const withCond = (pageUrlContains: string): AppState => ({
+      ...makeState([rule]),
+      groups: [
+        {
+          id: DEFAULT_GROUP_ID,
+          name: 'Default',
+          enabled: true,
+          order: 0,
+          activation: { pageUrlContains },
+        },
+      ],
+    });
+    const reqUrl = 'https://api.github.com/users/octocat';
+    expect(
+      findFirstMockMatch(
+        withCond('therapy-details'),
+        reqUrl,
+        'GET',
+        'https://app/overview/therapy-details'
+      )?.id
+    ).toBe('rule_1');
+    // Request url still matches, but the page url does not contain the path.
+    expect(
+      findFirstMockMatch(withCond('therapy-details'), reqUrl, 'GET', 'https://app/overview/summary')
+    ).toBeUndefined();
+  });
+
   it('returns the first enabled mock rule that matches', () => {
     const r1 = makeMockRule({ id: 'r1', enabled: false });
     const r2 = makeMockRule({ id: 'r2' });

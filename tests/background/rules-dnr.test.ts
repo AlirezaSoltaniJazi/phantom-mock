@@ -30,6 +30,25 @@ function makeState(rules: Rule[], masterEnabled = true): AppState {
   };
 }
 
+function stateWithGroupCondition(rules: Rule[], pageUrlContains: string): AppState {
+  return {
+    schemaVersion: CURRENT_SCHEMA_VERSION,
+    masterEnabled: true,
+    groups: [
+      {
+        id: DEFAULT_GROUP_ID,
+        name: 'Default',
+        enabled: true,
+        order: 0,
+        activation: { pageUrlContains },
+      },
+    ],
+    rules,
+    storageProfiles: [],
+    cookieProfiles: [],
+  };
+}
+
 describe('translateToDnrRules', () => {
   it('returns empty when master is off', () => {
     expect(translateToDnrRules(makeState([makeHeaderRule()], false))).toEqual([]);
@@ -132,6 +151,17 @@ describe('translateToDnrRules', () => {
       expect(dnrId).toBeLessThan(2_147_483_647);
       expect(Number.isInteger(dnrId)).toBe(true);
     }
+  });
+
+  it('ignores a group page-URL condition for header (DNR) rules', () => {
+    // DNR can't see the initiating page's URL path, so the page-URL activation
+    // does not change the emitted rule — it stays identical to the plain case.
+    const plain = translateToDnrRules(makeState([makeHeaderRule()]));
+    const conditioned = translateToDnrRules(
+      stateWithGroupCondition([makeHeaderRule()], 'overview/therapy-details')
+    );
+    expect(conditioned).toEqual(plain);
+    expect(conditioned[0]?.condition.urlFilter).toBe('/api/');
   });
 
   it('skips mock rules entirely', () => {
