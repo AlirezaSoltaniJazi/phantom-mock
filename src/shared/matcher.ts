@@ -59,12 +59,30 @@ export function isRuleActive(rule: Rule, view: ActiveRulesView, masterEnabled: b
   return true;
 }
 
-export function findFirstMockMatch(state: AppState, url: string, method: string): Rule | undefined {
+// Optional per-group activation gate, evaluated against the current PAGE (tab)
+// URL — i.e. `window.location.href`, NOT the per-request endpoint URL.
+// Independent of `Group.enabled` (which `isRuleActive` already checks): a group
+// with no condition — or an empty `pageUrlContains` — is always active here.
+export function isGroupActive(group: Group, pageUrl: string): boolean {
+  const needle = group.activation?.pageUrlContains;
+  if (!needle) return true;
+  return pageUrl.includes(needle);
+}
+
+export function findFirstMockMatch(
+  state: AppState,
+  url: string,
+  method: string,
+  pageUrl = ''
+): Rule | undefined {
   if (!state.masterEnabled) return undefined;
   const view = buildActiveView(state);
+  const groupsById = new Map(state.groups.map((g) => [g.id, g]));
   for (const rule of state.rules) {
     if (rule.action.kind !== 'mock') continue;
     if (!isRuleActive(rule, view, state.masterEnabled)) continue;
+    const group = groupsById.get(rule.groupId);
+    if (group && !isGroupActive(group, pageUrl)) continue;
     if (specMatches(rule.match, url, method)) {
       return rule;
     }

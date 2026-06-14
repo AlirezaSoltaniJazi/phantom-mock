@@ -52,6 +52,52 @@ describe('injected page-mock fetch patch', () => {
     expect(res.status).toBe(201);
   });
 
+  it('gates a group on the PAGE url (window.location), not the request url', () => {
+    setRulesCacheForTest({
+      masterEnabled: true,
+      groups: [
+        {
+          id: 'default',
+          name: 'Default',
+          enabled: true,
+          order: 0,
+          activation: { pageUrlContains: 'overview/therapy-details' },
+        },
+      ],
+      rules: [mockRule],
+    });
+    // The debug test() API exercises matching without touching the network. The
+    // request url is identical in both cases — only the page url differs.
+    const api = (
+      window as unknown as {
+        __phantomMock: { test(url: string, method?: string): { matched: boolean } };
+      }
+    ).__phantomMock;
+    window.location.href = 'https://app.example.com/patients/6/overview/summary';
+    expect(api.test('https://example.com/api/widgets').matched).toBe(false);
+    window.location.href = 'https://app.example.com/patients/6/overview/therapy-details';
+    expect(api.test('https://example.com/api/widgets').matched).toBe(true);
+  });
+
+  it('returns the mock when the page url satisfies the condition', async () => {
+    setRulesCacheForTest({
+      masterEnabled: true,
+      groups: [
+        {
+          id: 'default',
+          name: 'Default',
+          enabled: true,
+          order: 0,
+          activation: { pageUrlContains: 'therapy-details' },
+        },
+      ],
+      rules: [mockRule],
+    });
+    window.location.href = 'https://app.example.com/x/overview/therapy-details';
+    const res = await window.fetch('https://example.com/api/widgets');
+    expect(res.status).toBe(201);
+  });
+
   it('returns synthetic Response with the response body via XHR', async () => {
     setRulesCacheForTest({
       masterEnabled: true,

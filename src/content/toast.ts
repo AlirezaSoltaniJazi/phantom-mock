@@ -51,6 +51,9 @@ function ensureHost(): ShadowRoot | null {
       background: #6ad29a;
       flex-shrink: 0;
     }
+    .pm-toast-dot.group {
+      background: #8a7df0;
+    }
     .pm-toast-name {
       font-weight: 600;
       font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -76,7 +79,7 @@ function truncate(name: string): string {
   return `${name.slice(0, MAX_NAME_LEN - 1)}…`;
 }
 
-export function showRuleAppliedToast(ruleName: string): void {
+function pushToast(label: string, name: string, dotVariant = ''): void {
   if (!ensureHost() || !stack) return;
   while (stack.childElementCount >= MAX_TOASTS && stack.firstChild) {
     stack.firstChild.remove();
@@ -84,13 +87,23 @@ export function showRuleAppliedToast(ruleName: string): void {
   const toast = document.createElement('div');
   toast.className = 'pm-toast';
   const dot = document.createElement('span');
-  dot.className = 'pm-toast-dot';
-  const label = document.createElement('span');
-  label.textContent = 'rule applied: ';
-  const name = document.createElement('span');
-  name.className = 'pm-toast-name';
-  name.textContent = truncate(ruleName);
-  toast.append(dot, label, name);
+  dot.className = dotVariant ? `pm-toast-dot ${dotVariant}` : 'pm-toast-dot';
+  const labelEl = document.createElement('span');
+  labelEl.textContent = label;
+  const nameEl = document.createElement('span');
+  nameEl.className = 'pm-toast-name';
+  nameEl.textContent = truncate(name);
+  toast.append(dot, labelEl, nameEl);
   stack.appendChild(toast);
   setTimeout(() => toast.remove(), TOAST_TTL_MS);
+}
+
+export function showRuleAppliedToast(ruleName: string): void {
+  pushToast('rule applied: ', ruleName);
+}
+
+// Distinct toast (purple dot) shown the first time a page-conditional group's
+// rule fires on the current page — i.e. the group was selected by its condition.
+export function showGroupActivatedToast(groupName: string): void {
+  pushToast('group active: ', groupName, 'group');
 }

@@ -3,14 +3,39 @@ import { isRuntimeMessage } from '@/shared/messages';
 import { getPrefs, subscribePrefs } from '@/shared/prefs';
 import type { AppState, MockHit, Rule, UIPreferences } from '@/shared/types';
 import { DEFAULT_UI_PREFERENCES } from '@/shared/types';
-import { showRuleAppliedToast } from './toast';
+import { showGroupActivatedToast, showRuleAppliedToast } from './toast';
+import { conditionalGroupForHit } from './group-notify';
 
 // The page-world script that does the actual fetch/XHR patching is registered
 // as a second content_scripts entry with `world: "MAIN"` in manifest.json.
 // This file runs in the isolated world and only bridges messages between the
 // page and the service worker.
 
+// Full latest state, kept so HIT handling can map a hit's rule → its group and
+// detect whether that group was activated by a page-URL condition.
+let latestState: AppState | null = null;
+
+// Per-page dedup so a conditional group's "group active" toast shows only once
+// per page URL, not on every mocked request. Resets when the URL changes (incl.
+// SPA client-side navigation, since the next hit re-reads location.href).
+let notifyUrl = '';
+const notifiedGroupIds = new Set<string>();
+
+function maybeNotifyConditionalGroup(hit: MockHit): void {
+  if (!latestState) return;
+  const currentUrl = window.location.href;
+  if (currentUrl !== notifyUrl) {
+    notifyUrl = currentUrl;
+    notifiedGroupIds.clear();
+  }
+  const group = conditionalGroupForHit(latestState, hit.ruleId);
+  if (!group || notifiedGroupIds.has(group.id)) return;
+  notifiedGroupIds.add(group.id);
+  showGroupActivatedToast(group.name);
+}
+
 function postRulesToPage(state: AppState): void {
+  latestState = state;
   const mockRules = state.rules.filter((r): r is Rule => r.action.kind === 'mock');
   window.postMessage(
     {
@@ -56,6 +81,7 @@ window.addEventListener('message', (event: MessageEvent) => {
     });
     if (cachedPrefs.showToast) {
       try {
+        maybeNotifyConditionalGroup(hit);
         showRuleAppliedToast(hit.ruleName);
       } catch (err) {
         console.warn('[phantom-mock] toast failed', err);

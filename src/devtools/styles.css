@@ -151,6 +151,26 @@ html,
   box-shadow: inset 0 2px 0 var(--accent);
 }
 
+/* Chip marking a group that only activates when the request URL matches. */
+.pm-group-cond-chip {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  border-radius: 3px;
+  padding: 1px 5px;
+  white-space: nowrap;
+}
+
+/* Inline activation-condition editor expanded under a group header. */
+.pm-group-condition {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+}
+
 /* "Show on popup" toggle shown only in the Groups tab (via renderGroupExtra). */
 .pm-group-popup-toggle {
   display: inline-flex;

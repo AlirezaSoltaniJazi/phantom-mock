@@ -270,7 +270,21 @@ function validateGroup(value: unknown, index: number): Result<Group> {
     return { ok: false, error: `groups[${index}].enabled must be a boolean` };
   }
   const order = typeof g.order === 'number' ? g.order : index;
-  return { ok: true, value: { id: g.id, name: g.name, enabled: g.enabled, order } };
+  const group: Group = { id: g.id, name: g.name, enabled: g.enabled, order };
+  if (g.activation !== undefined) {
+    if (typeof g.activation !== 'object' || g.activation === null) {
+      return { ok: false, error: `groups[${index}].activation must be an object` };
+    }
+    const a = g.activation as Record<string, unknown>;
+    if (a.pageUrlContains !== undefined && typeof a.pageUrlContains !== 'string') {
+      return { ok: false, error: `groups[${index}].activation.pageUrlContains must be a string` };
+    }
+    // Only carry a meaningful (non-empty) condition; drop empty/blank ones.
+    if (typeof a.pageUrlContains === 'string' && a.pageUrlContains.length > 0) {
+      group.activation = { pageUrlContains: a.pageUrlContains };
+    }
+  }
+  return { ok: true, value: group };
 }
 
 function validateRule(value: unknown, index: number, groupIds: Set<string>): Result<Rule> {

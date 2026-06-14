@@ -27,6 +27,35 @@ export function GroupsTable({ state, mutate, prefs, setPrefs }: Props): JSX.Elem
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [overIndex, setOverIndex] = useState<number | null>(null);
 
+  // Inline per-group activation-condition editor. Only one panel is open at a
+  // time; `draftPageUrl` holds the unsaved page-URL substring for the open group.
+  const [expandedGroupId, setExpandedGroupId] = useState<string | null>(null);
+  const [draftPageUrl, setDraftPageUrl] = useState('');
+
+  function toggleCondition(g: Group): void {
+    setExpandedGroupId((cur) => (cur === g.id ? null : g.id));
+    setDraftPageUrl(g.activation?.pageUrlContains ?? '');
+  }
+
+  // Rebuild the group with (or without) an activation condition. An empty value
+  // omits the `activation` key entirely (exactOptionalPropertyTypes).
+  function withActivation(g: Group, pageUrlContains: string): Group {
+    const base: Group = { id: g.id, name: g.name, enabled: g.enabled, order: g.order };
+    if (pageUrlContains.length > 0) base.activation = { pageUrlContains };
+    return base;
+  }
+
+  function saveCondition(g: Group): void {
+    setExpandedGroupId(null);
+    void mutate({ kind: 'upsertGroup', group: withActivation(g, draftPageUrl.trim()) });
+  }
+
+  function clearCondition(g: Group): void {
+    setExpandedGroupId(null);
+    setDraftPageUrl('');
+    void mutate({ kind: 'upsertGroup', group: withActivation(g, '') });
+  }
+
   function resetDrag(): void {
     setDragIndex(null);
     setOverIndex(null);
@@ -122,6 +151,14 @@ export function GroupsTable({ state, mutate, prefs, setPrefs }: Props): JSX.Elem
               <span style={{ color: 'var(--fg-muted)', fontSize: 11 }}>
                 {ruleCount.get(g.id) ?? 0}
               </span>
+              {g.activation?.pageUrlContains ? (
+                <span
+                  className="pm-group-cond-chip"
+                  title={`Active only on pages whose URL contains: ${g.activation.pageUrlContains}`}
+                >
+                  ⚡ page
+                </span>
+              ) : null}
               <label className="pm-group-popup-toggle" title="Show this group on the popup">
                 <input
                   type="checkbox"
@@ -131,6 +168,14 @@ export function GroupsTable({ state, mutate, prefs, setPrefs }: Props): JSX.Elem
                 />
                 <span>Popup</span>
               </label>
+              <button
+                className="pm-btn secondary"
+                type="button"
+                title="Limit when this group's rules apply"
+                onClick={() => toggleCondition(g)}
+              >
+                Condition
+              </button>
               <button
                 className="pm-btn secondary"
                 type="button"
@@ -156,6 +201,38 @@ export function GroupsTable({ state, mutate, prefs, setPrefs }: Props): JSX.Elem
                 </button>
               ) : null}
             </div>
+            {expandedGroupId === g.id ? (
+              <div className="pm-group-condition">
+                <div className="pm-field">
+                  <label htmlFor={`cond-${g.id}`}>Activate only on pages whose URL contains</label>
+                  <input
+                    id={`cond-${g.id}`}
+                    type="text"
+                    placeholder="overview/therapy-details   (leave empty to always activate)"
+                    value={draftPageUrl}
+                    onChange={(e) => setDraftPageUrl(e.target.value)}
+                  />
+                </div>
+                <div className="pm-row">
+                  <button className="pm-btn" type="button" onClick={() => saveCondition(g)}>
+                    Save
+                  </button>
+                  <button
+                    className="pm-btn secondary"
+                    type="button"
+                    onClick={() => clearCondition(g)}
+                  >
+                    Clear
+                  </button>
+                </div>
+                <span className="pm-debug-muted">
+                  Matches the page (tab) URL in the address bar — when it contains this text, this
+                  group&apos;s mock rules apply to every endpoint that page calls.
+                  Header-modification rules can&apos;t see the page URL (Chrome DNR limitation) and
+                  are not page-scoped.
+                </span>
+              </div>
+            ) : null}
           </div>
         );
       })}

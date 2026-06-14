@@ -1,5 +1,5 @@
 import { PAGE_MESSAGE_SOURCE, PAGE_MESSAGE_TYPES } from '@/shared/constants';
-import { buildActiveView, isRuleActive, specMatches } from '@/shared/matcher';
+import { buildActiveView, isGroupActive, isRuleActive, specMatches } from '@/shared/matcher';
 import { renderRandomTokens } from '@/shared/template';
 import type { AppState, Group, MockAction, MockHit, Rule } from '@/shared/types';
 
@@ -42,9 +42,14 @@ function findMatch(url: string, method: string): Rule | undefined {
     cookieProfiles: [],
   };
   const view = buildActiveView(fakeState);
+  const groupsById = new Map(cache.groups.map((g) => [g.id, g]));
+  // Group activation gates on the current page (tab) URL, not the request URL.
+  const pageUrl = window.location.href;
   for (const rule of cache.rules) {
     if (rule.action.kind !== 'mock') continue;
     if (!isRuleActive(rule, view, cache.masterEnabled)) continue;
+    const group = groupsById.get(rule.groupId);
+    if (group && !isGroupActive(group, pageUrl)) continue;
     if (specMatches(rule.match, url, method)) return rule;
   }
   return undefined;
@@ -320,9 +325,13 @@ function exposeDebugApi(): void {
         cookieProfiles: [],
       };
       const view = buildActiveView(fakeState);
+      const groupsById = new Map(cache.groups.map((g) => [g.id, g]));
+      const pageUrl = window.location.href;
       for (const rule of cache.rules) {
         if (rule.action.kind !== 'mock') continue;
         if (!isRuleActive(rule, view, cache.masterEnabled)) continue;
+        const group = groupsById.get(rule.groupId);
+        if (group && !isGroupActive(group, pageUrl)) continue;
         if (specMatches(rule.match, url, method)) {
           return { matched: true, ruleId: rule.id, ruleName: rule.name };
         }
