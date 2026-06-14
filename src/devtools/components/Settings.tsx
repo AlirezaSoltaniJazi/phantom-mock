@@ -23,7 +23,9 @@ import {
   type StorageProfile,
   type UIPreferences,
 } from '@/shared/types';
-import type { StateMutation } from '@/shared/messages';
+import { sendMessage, type StateMutation } from '@/shared/messages';
+import { MESSAGE_TYPES } from '@/shared/constants';
+import { defaultAppState } from '@/shared/default-state';
 
 interface Props {
   state: AppState;
@@ -39,8 +41,54 @@ export function Settings({ state, mutate, prefs, setPrefs }: Props): JSX.Element
       <Notifications prefs={prefs} setPrefs={setPrefs} />
       <ExportPanel state={state} />
       <ImportPanel state={state} mutate={mutate} />
+      <DangerZone mutate={mutate} />
       <About />
     </div>
+  );
+}
+
+function DangerZone({
+  mutate,
+}: {
+  mutate: (mutation: StateMutation) => Promise<void>;
+}): JSX.Element {
+  const [done, setDone] = useState(false);
+
+  async function resetAll(): Promise<void> {
+    const ok = window.confirm(
+      'Reset all data?\n\n' +
+        'This permanently deletes every rule, group, storage profile, and cookie ' +
+        'profile, and clears the hit log. Appearance & notification preferences are ' +
+        'kept.\n\nThis cannot be undone — export a backup first if you need one.'
+    );
+    if (!ok) return;
+    setDone(false);
+    await mutate({ kind: 'replaceState', state: defaultAppState() });
+    // Logs live outside AppState — clear them too. Best-effort; ignore failures.
+    await Promise.allSettled([
+      sendMessage({ type: MESSAGE_TYPES.CLEAR_HIT_LOG }),
+      sendMessage({ type: MESSAGE_TYPES.CLEAR_DNR_MATCH_LOG }),
+    ]);
+    setDone(true);
+  }
+
+  return (
+    <fieldset className="pm-fieldset">
+      <legend>Danger zone</legend>
+      <div className="pm-field">
+        <span style={{ color: 'var(--fg-muted)' }}>
+          Permanently delete all rules, groups, storage profiles, and cookie profiles, and clear the
+          hit log. Your appearance &amp; notification preferences are kept. Consider exporting a
+          backup above first.
+        </span>
+        <div className="pm-row" style={{ marginTop: 8 }}>
+          <button type="button" className="pm-btn danger" onClick={() => void resetAll()}>
+            Reset all data
+          </button>
+          {done ? <span style={{ color: 'var(--ok)' }}>All data has been reset.</span> : null}
+        </div>
+      </div>
+    </fieldset>
   );
 }
 
