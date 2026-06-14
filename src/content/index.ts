@@ -4,7 +4,8 @@ import { getPrefs, subscribePrefs } from '@/shared/prefs';
 import type { AppState, MockHit, Rule, UIPreferences } from '@/shared/types';
 import { DEFAULT_UI_PREFERENCES } from '@/shared/types';
 import { showGroupActivatedToast, showRuleAppliedToast } from './toast';
-import { conditionalGroupForHit } from './group-notify';
+import { groupForRule } from './group-notify';
+import { isExtensionContextValid, sendRuntimeMessage } from './runtime';
 
 // The page-world script that does the actual fetch/XHR patching is registered
 // as a second content_scripts entry with `world: "MAIN"` in manifest.json.
@@ -15,23 +16,17 @@ import { conditionalGroupForHit } from './group-notify';
 // detect whether that group was activated by a page-URL condition.
 let latestState: AppState | null = null;
 
-// Per-page dedup so a conditional group's "group active" toast shows only once
-// per page URL, not on every mocked request. Resets when the URL changes (incl.
-// SPA client-side navigation, since the next hit re-reads location.href).
-let notifyUrl = '';
-const notifiedGroupIds = new Set<string>();
-
-function maybeNotifyConditionalGroup(hit: MockHit): void {
-  if (!latestState) return;
-  const currentUrl = window.location.href;
-  if (currentUrl !== notifyUrl) {
-    notifyUrl = currentUrl;
-    notifiedGroupIds.clear();
+// Surface, for every mocked request, which group it came from. When that group
+// was selected by a page-URL condition, also show the distinct "group active"
+// toast — on EVERY such hit, so it's always clear the conditional group is live.
+function notifyToasts(hit: MockHit): void {
+  const group = latestState ? groupForRule(latestState, hit.ruleId) : undefined;
+  if (group?.activation?.pageUrlContains) {
+    showGroupActivatedToast(group.name);
+    showRuleAppliedToast(hit.ruleName);
+  } else {
+    showRuleAppliedToast(hit.ruleName, group?.name);
   }
-  const group = conditionalGroupForHit(latestState, hit.ruleId);
-  if (!group || notifiedGroupIds.has(group.id)) return;
-  notifiedGroupIds.add(group.id);
-  showGroupActivatedToast(group.name);
 }
 
 function postRulesToPage(state: AppState): void {
@@ -52,6 +47,7 @@ function postRulesToPage(state: AppState): void {
 }
 
 async function pullStateAndSeed(): Promise<void> {
+  if (!isExtensionContextValid()) return;
   try {
     const response = await chrome.runtime.sendMessage({ type: MESSAGE_TYPES.GET_STATE });
     if (response && typeof response === 'object' && 'state' in response) {
@@ -76,13 +72,13 @@ window.addEventListener('message', (event: MessageEvent) => {
   if (!data || data.source !== PAGE_MESSAGE_SOURCE) return;
   if (data.type === PAGE_MESSAGE_TYPES.HIT) {
     const hit = data.payload as MockHit;
-    chrome.runtime.sendMessage({ type: MESSAGE_TYPES.MOCK_HIT, hit }).catch(() => {
-      // service worker may have torn down; nothing actionable here
-    });
+    // Synchronously guarded — an orphaned content script (extension reloaded)
+    // keeps receiving page-world HITs; an unguarded send throws "Extension
+    // context invalidated" that a `.catch()` cannot swallow.
+    sendRuntimeMessage({ type: MESSAGE_TYPES.MOCK_HIT, hit });
     if (cachedPrefs.showToast) {
       try {
-        maybeNotifyConditionalGroup(hit);
-        showRuleAppliedToast(hit.ruleName);
+        notifyToasts(hit);
       } catch (err) {
         console.warn('[phantom-mock] toast failed', err);
       }

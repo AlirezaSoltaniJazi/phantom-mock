@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { conditionalGroupForHit } from '@/content/group-notify';
+import { groupForRule } from '@/content/group-notify';
 import { CURRENT_SCHEMA_VERSION, type AppState, type Rule } from '@/shared/types';
 import { DEFAULT_GROUP_ID } from '@/shared/constants';
 
@@ -42,18 +42,20 @@ function makeState(): AppState {
   };
 }
 
-describe('conditionalGroupForHit', () => {
-  it('returns the group when the hit rule belongs to a page-conditional group', () => {
-    const g = conditionalGroupForHit(makeState(), 'rule_cond');
-    expect(g?.id).toBe('grp_cond');
-    expect(g?.name).toBe('Therapy');
+describe('groupForRule', () => {
+  it('returns the owning group for a rule in an unconditional group', () => {
+    const g = groupForRule(makeState(), 'rule_plain');
+    expect(g?.id).toBe(DEFAULT_GROUP_ID);
+    expect(g?.activation?.pageUrlContains).toBeUndefined();
   });
 
-  it('returns undefined for a rule in an unconditional group', () => {
-    expect(conditionalGroupForHit(makeState(), 'rule_plain')).toBeUndefined();
+  it('returns the owning group (with its activation) for a conditional-group rule', () => {
+    const g = groupForRule(makeState(), 'rule_cond');
+    expect(g?.name).toBe('Therapy');
+    expect(g?.activation?.pageUrlContains).toBe('therapy-details');
   });
 
   it('returns undefined for an unknown rule id', () => {
-    expect(conditionalGroupForHit(makeState(), 'nope')).toBeUndefined();
+    expect(groupForRule(makeState(), 'nope')).toBeUndefined();
   });
 });

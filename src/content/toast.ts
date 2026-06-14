@@ -1,7 +1,7 @@
 const HOST_ID = 'phantom-mock-toast-host';
 const MAX_NAME_LEN = 20;
-const TOAST_TTL_MS = 2200;
-const MAX_TOASTS = 3;
+const TOAST_TTL_MS = 2600;
+const MAX_TOASTS = 4;
 
 let shadowRoot: ShadowRoot | null = null;
 let stack: HTMLDivElement | null = null;
@@ -38,11 +38,15 @@ function ensureHost(): ShadowRoot | null {
       padding: 6px 10px;
       border-radius: 6px;
       box-shadow: 0 4px 14px rgba(0,0,0,0.25);
-      max-width: 320px;
+      max-width: 340px;
       display: inline-flex;
       align-items: center;
       gap: 8px;
       animation: pm-toast-in 0.18s ease-out, pm-toast-out 0.25s ease-in ${TOAST_TTL_MS - 250}ms forwards;
+    }
+    .pm-toast[data-kind="group"] {
+      background: rgba(52, 44, 110, 0.95);
+      box-shadow: 0 4px 16px rgba(80,60,200,0.35);
     }
     .pm-toast-dot {
       width: 8px;
@@ -52,11 +56,16 @@ function ensureHost(): ShadowRoot | null {
       flex-shrink: 0;
     }
     .pm-toast-dot.group {
-      background: #8a7df0;
+      background: #b3a8ff;
     }
     .pm-toast-name {
       font-weight: 600;
       font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+    .pm-toast-tag {
+      color: #b9b9c6;
+      font-size: 11px;
+      flex-shrink: 0;
     }
     @keyframes pm-toast-in {
       from { opacity: 0; transform: translateY(6px); }
@@ -79,31 +88,52 @@ function truncate(name: string): string {
   return `${name.slice(0, MAX_NAME_LEN - 1)}…`;
 }
 
-function pushToast(label: string, name: string, dotVariant = ''): void {
+interface ToastSpec {
+  kind: 'rule' | 'group';
+  label: string;
+  name: string;
+  tag?: string;
+}
+
+function pushToast(spec: ToastSpec): void {
   if (!ensureHost() || !stack) return;
   while (stack.childElementCount >= MAX_TOASTS && stack.firstChild) {
     stack.firstChild.remove();
   }
   const toast = document.createElement('div');
   toast.className = 'pm-toast';
+  toast.dataset.kind = spec.kind;
   const dot = document.createElement('span');
-  dot.className = dotVariant ? `pm-toast-dot ${dotVariant}` : 'pm-toast-dot';
+  dot.className = spec.kind === 'group' ? 'pm-toast-dot group' : 'pm-toast-dot';
   const labelEl = document.createElement('span');
-  labelEl.textContent = label;
+  labelEl.textContent = spec.label;
   const nameEl = document.createElement('span');
   nameEl.className = 'pm-toast-name';
-  nameEl.textContent = truncate(name);
+  nameEl.textContent = truncate(spec.name);
   toast.append(dot, labelEl, nameEl);
+  if (spec.tag) {
+    const tagEl = document.createElement('span');
+    tagEl.className = 'pm-toast-tag';
+    tagEl.textContent = `· ${truncate(spec.tag)}`;
+    toast.append(tagEl);
+  }
   stack.appendChild(toast);
   setTimeout(() => toast.remove(), TOAST_TTL_MS);
 }
 
-export function showRuleAppliedToast(ruleName: string): void {
-  pushToast('rule applied: ', ruleName);
+// Per-request toast (green dot). Tagged with the owning group's name when known,
+// so it's clear WHICH group applied each mock.
+export function showRuleAppliedToast(ruleName: string, groupName?: string): void {
+  pushToast({
+    kind: 'rule',
+    label: 'rule applied: ',
+    name: ruleName,
+    ...(groupName ? { tag: groupName } : {}),
+  });
 }
 
-// Distinct toast (purple dot) shown the first time a page-conditional group's
-// rule fires on the current page — i.e. the group was selected by its condition.
+// Distinct toast (purple) shown each time a page-conditional group's rule fires
+// — i.e. the group was selected by its condition for that request.
 export function showGroupActivatedToast(groupName: string): void {
-  pushToast('group active: ', groupName, 'group');
+  pushToast({ kind: 'group', label: 'group active: ', name: groupName });
 }

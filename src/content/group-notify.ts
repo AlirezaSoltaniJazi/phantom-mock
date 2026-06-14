@@ -1,12 +1,10 @@
 import type { AppState, Group } from '@/shared/types';
 
-// Returns the group a hit's rule belongs to ONLY when that group has a page-URL
-// activation condition — i.e. the rule fired because the group was selected by
-// its condition. Returns undefined for rules in unconditional groups (or when
-// the rule/group is unknown), so callers notify only for conditional groups.
-export function conditionalGroupForHit(state: AppState, ruleId: string): Group | undefined {
+// The group a hit's rule belongs to (any group), or undefined when the rule or
+// its group is unknown. Used to label "rule applied" toasts with their group and
+// to detect (via `group.activation`) whether the group is page-conditional.
+export function groupForRule(state: AppState, ruleId: string): Group | undefined {
   const rule = state.rules.find((r) => r.id === ruleId);
   if (!rule) return undefined;
-  const group = state.groups.find((g) => g.id === rule.groupId);
-  return group?.activation?.pageUrlContains ? group : undefined;
+  return state.groups.find((g) => g.id === rule.groupId);
 }
