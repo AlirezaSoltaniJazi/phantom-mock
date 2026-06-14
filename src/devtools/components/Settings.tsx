@@ -231,14 +231,17 @@ function ExportPanel({ state }: { state: AppState }): JSX.Element {
       storageProfileIds: selection.storageProfiles,
       cookieProfileIds: selection.cookieProfiles,
     });
-    const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    // YYYYMMDD-HHMMSS (UTC) so repeat exports on the same day don't collide
+    // (which is what produces the browser's "… (1).json" suffix).
+    const iso = new Date().toISOString();
+    const stamp = `${iso.slice(0, 10).replace(/-/g, '')}-${iso.slice(11, 19).replace(/:/g, '')}`;
     const blob = new Blob([JSON.stringify(bundle, null, 2)], {
       type: 'application/json',
     });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `phantom-mock-rules-${today}.json`;
+    link.download = `phantom-mock-rules-${stamp}.json`;
     link.click();
     URL.revokeObjectURL(url);
   }

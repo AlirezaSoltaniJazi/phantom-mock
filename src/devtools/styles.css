@@ -47,13 +47,18 @@ html,
 
 .pm-tabs {
   display: flex;
+  /* Wrap onto multiple rows on narrow panels so all tabs stay visible and the
+     strip never forces the whole panel into a horizontal scroll. */
+  flex-wrap: wrap;
   gap: 4px;
-  padding: 8px 12px 0;
+  padding: 8px 12px;
   border-bottom: 1px solid var(--border);
   background: var(--bg-alt);
 }
 
 .pm-tab {
+  flex: 0 0 auto;
+  white-space: nowrap;
   background: transparent;
   border: none;
   padding: 8px 14px;
@@ -71,6 +76,10 @@ html,
 
 .pm-content {
   flex: 1;
+  /* min-width:0 lets this flex child shrink to the panel instead of being
+     widened by long, unbreakable content — wide content scrolls inside here
+     rather than pushing the whole panel sideways. */
+  min-width: 0;
   overflow: auto;
   padding: 16px;
 }
