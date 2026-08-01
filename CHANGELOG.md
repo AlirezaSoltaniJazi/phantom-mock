@@ -5,486 +5,177 @@ All notable changes to Phantom Mock are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- Behind-the-scenes improvements to how new versions are released, so
+  updates reach users more smoothly and reliably.
+
 ## [0.7.0] - 2026-06-14
 
 ### Added
 
-- **Drag-and-drop group reordering** in the **Groups** tab. Each group row has a
-  grip handle (`⠿`); drag a group to reorder it and the new order is reflected
-  everywhere groups are listed (Groups tab, Rules tab, and the popup). Backed by
-  a new `reorderGroups` state mutation; order persists in `chrome.storage.local`.
-  Unit-tested (`moveItem` / `reorderGroups` in `src/shared/groups.ts`).
-- **Per-group page-URL activation conditions.** A group can be set (Groups tab →
-  **Condition**) to activate only while the current **page (tab) URL** contains a
-  given substring — e.g. a group gated on `overview/therapy-details` mocks every
-  endpoint that page calls and stays off on other routes. Evaluated in the page
-  world against `window.location.href`, so SPA client-side navigation is honoured
-  without a reload. The condition round-trips through **Settings → Export /
-  Import**; pre-existing bundles without it still import. _Note:_
-  header-modification (declarativeNetRequest) rules can't see the initiating
-  page's URL path (a Chrome DNR limitation) and are therefore not page-scoped.
-- **Settings → Danger zone → "Reset all data".** A single, confirmation-guarded
-  action that deletes every rule, group, storage profile, and cookie profile
-  (back to one empty **Default** group) and clears the Hit Log and DNR match log.
-  Appearance & notification preferences are intentionally kept. The pristine
-  state now lives in one shared `defaultAppState()` reused by both first-run
-  seeding and reset.
+- Drag to reorder groups in the Groups tab.
+- Groups can now be set to activate only on specific pages.
+- A "Reset all data" option in Settings for a clean slate.
 
 ### Changed
 
-- **In-page toasts now identify their group.** Every "rule applied" toast is
-  tagged with the owning group's name, and a mock fired from a page-conditional
-  group additionally shows a distinct purple **"group active: &lt;group&gt;"**
-  toast on every such request — so it's always obvious which conditional group is
-  live. Both honour the existing **Show toast** preference.
-- **Tab bar wraps on narrow panels.** With many tabs, a side-docked DevTools
-  panel used to drag the whole panel into a horizontal scroll; the tab strip now
-  wraps onto multiple rows and the content always fits the panel width (a long,
-  unbreakable rule URL scrolls inside the content area instead of widening the
-  panel).
-- **Export filenames now include the time** —
-  `phantom-mock-rules-YYYYMMDD-HHMMSS.json` instead of date-only — so exporting
-  more than once a day no longer collides into a browser `… (1).json` duplicate.
-- **Routine dependency updates** — `eslint` 10.4 → 10.5, `@typescript-eslint/*`
-  8.60 → 8.61, `happy-dom` 20.9 → 20.10, `prettier` 3.8.3 → 3.8.4, and
-  `@types/chrome` / `@types/node` patches.
+- Toast notifications now show which group triggered them.
+- The tab bar wraps instead of overflowing on narrow panels.
+- Exported file names now include the time, so exporting more than once a
+  day no longer overwrites the previous file.
+- Routine dependency updates.
 
 ### Fixed
 
-- **"Extension context invalidated" console error** from orphaned content
-  scripts. After the extension is reloaded, updated, or disabled, an
-  already-injected content script keeps receiving page-world hits and its
-  `chrome.runtime.sendMessage` threw **synchronously** — which a trailing
-  `.catch()` cannot swallow — surfacing as an uncaught error on every mocked
-  request. Runtime messaging is now guarded (`chrome.runtime?.id` check plus
-  try/catch in `src/content/runtime.ts`), so orphaned tabs stay silent until
-  refreshed. Regression-tested.
+- Fixed a console error that could appear after reloading or updating the
+  extension.
 
 ### Security
 
-- **`@crxjs/vite-plugin` upgraded 2.4.0 → 2.6.1**, pinning the patched
-  `rollup@2.80.0` and clearing the only `npm audit` finding —
-  **GHSA-mw96-cpmx-2vgc / CVE-2026-27606** (Rollup arbitrary file write via path
-  traversal, HIGH), previously pulled in transitively via `rollup@2.79.2`. This
-  is a build-time-only dev dependency (no shipped-artifact exposure), but it is
-  now remediated and `npm audit` is clean.
+- Updated a build tool to fix a known security vulnerability (no impact on
+  the published extension itself).
 
 ## [0.6.0] - 2026-06-07
 
 ### Added
 
-- **Dynamic URL matching with `{random}` placeholders** — a new **Template**
-  URL match type. `{random}` matches any value within a path segment and
-  `{random:N}` matches exactly N random alphanumeric characters, so a single
-  rule covers dynamic ids (e.g. `/devices/{random}/details` matches every
-  device). The **same tokens in a mock response body generate a fresh random
-  value on every request** — a body of `{"id":"{random:20}"}` returns a new
-  20-character id each call. Templates compile to a regex internally and work
-  for both mock rules and header (declarativeNetRequest) rules.
-- **Groups tab** — a dedicated DevTools panel tab for managing rule groups
-  (create, rename, delete, enable/disable) at a glance, without the rules
-  listed inside each group. Each group has a **"Popup" toggle** that controls
-  whether it appears on the browser-action popup — a local-only display
-  preference, independent of the group's `enabled` state and not part of
-  export/import.
-- **Version display** — the popup header now reads `Phantom Mock vX.Y.Z` (the
-  version in a smaller, muted font) and Settings gained an **About** section.
-  Both read the version from the manifest at runtime.
-- **Readable captured bodies** — request/response bodies in the Capture tab
-  render JSON as a collapsible, colour-coded tree (the same viewer used by the
-  rule editor); non-JSON bodies fall back to raw text.
+- New "Template" URL matching — one rule can now cover a whole family of
+  dynamic URLs (like ones containing an ID), and mock responses can include
+  auto-generated random values.
+- New Groups tab for managing rule groups at a glance.
+- The popup and Settings now show the extension's version number.
+- Captured request/response bodies are shown in a readable, collapsible
+  format.
 
 ### Changed
 
-- **The Release workflow now publishes two artifacts** per GitHub Release: the
-  production Chrome Web Store zip and a `-local` unpacked/sideload zip (named
-  "Phantom Mock - Local", with sourcemaps).
-- The popup shows a short guidance message when every group is hidden from it,
-  instead of an empty body.
+- Releases now include both the Chrome Web Store package and a local
+  install package.
+- The popup shows a helpful message when no groups are visible in it.
 
 ### Fixed
 
-- **Header overrides now apply to every request type** — scripts, stylesheets,
-  images, fonts, media and more, not just navigations and XHR/fetch.
-  Previously a sub-resource fetched via `<script>` (such as a Django admin's
-  `jsi18n` catalogue) reached the server **without** the injected header; on a
-  multi-tenant backend that resolves context from a header (e.g.
-  `X-Tenant-ID`) the missing header dropped that request into the wrong tenant
-  and silently logged the user out. The resource-type list is derived from the
-  live DNR enum so only types the running Chrome recognises are ever sent.
-- The **auto-assign-author** GitHub Action no longer fails on Dependabot (bot)
-  pull requests — it skips bot authors, so dependency PRs no longer carry a
-  red ✗.
+- Header rules now apply to every type of request, fixing cases where a
+  missing header could cause unexpected behavior on some sites.
+- Fixed an issue with automatic PR author assignment (contributor-facing).
 
 ## [0.5.2] - 2026-05-30
 
 ### Fixed
 
-- **Settings → Import was rejected with "MUTATE_STATE is restricted to
-  extension contexts".** The privileged-sender check introduced for the
-  v0.5.0 security audit used `sender.tab === undefined` to identify
-  trusted extension contexts. That assumption is wrong for Chrome MV3
-  DevTools panels — the panel reports `sender.tab` populated with the
-  inspected tab id, so every legitimate import was being mis-classified
-  as a content-script attack and rejected. Switched to a URL-prefix check
-  (`sender.url.startsWith(chrome.runtime.getURL(''))`) which correctly
-  identifies popup, options, and DevTools-panel senders regardless of
-  whether `sender.tab` is set. Cross-tab cookie spoofing protection for
-  genuine content scripts is unchanged. Regression-tested.
+- Fixed an issue where importing settings could be incorrectly blocked
+  with an error.
 
 ## [0.5.1] - 2026-05-30
 
 ### Changed
 
-- Replaced client-specific placeholder strings (a real product key /
-  Django cookie name / staging hostnames) with neutral generics
-  (`localStorageKey`, `app_locale`, `example.com`) in the editor
-  placeholders, store-listing copy, code comments, and test fixtures.
+- Replaced example placeholder text in the editor and docs with more
+  generic examples.
 
 ## [0.5.0] - 2026-05-30
 
 ### Added
 
-- **Cookie profiles** — a new pair of DevTools panel tabs (**Cookies** and
-  **Cookies Editor**) that mirror the Storage Profile UX for cookies on the
-  inspected page. Define a profile once (label, cookie name, optional
-  path, candidate values) and flip the cookie with a single chip click.
-  Common case: `app_locale` between `en` / `de` / `fr` without
-  touching the Application panel. Backed by `chrome.cookies.get` /
-  `chrome.cookies.set` / `chrome.cookies.remove` routed through the
-  service worker, so **httpOnly cookies are fully supported** (sessionid,
-  csrftoken, etc.) — `document.cookie` from the page would have silently
-  failed on those.
-- Cookie profiles round-trip through **Settings → Export / Import** as a
-  separate "Cookie profiles" section in the selection tree, with the same
-  per-item conflict resolution (`Overwrite` / `Rename as new`) as rules
-  and storage profiles. Pre-0.5.0 export bundles without `cookieProfiles`
-  still import cleanly.
-- Optional **prefix / suffix** value wrapping (introduced for storage
-  profiles in 0.4.0) also applies to cookie profiles — useful when a
-  cookie holds e.g. URL-encoded or JSON-quoted content.
+- New Cookie Profiles — save cookie values for the current page and switch
+  between them with one click, including secure cookies that JavaScript
+  normally can't access.
+- Cookie profiles are now included in Export/Import.
+- Optional prefix/suffix wrapping for cookie values.
 
 ### Changed
 
-- **New manifest permission**: `cookies`. Required to read/write `httpOnly`
-  cookies via `chrome.cookies.*`. Existing v0.4.0 users will see a
-  re-consent prompt on auto-update because of this permission addition;
-  the Chrome Web Store re-review for v0.5.0 will need a justification
-  noting that cookie reads/writes are scoped to the inspected tab's origin
-  and are user-initiated only.
+- The extension now asks for permission to read/write cookies.
 
 ### Fixed
 
-- Path scope handled correctly for cookies set/read on non-root paths
-  (e.g. `/api/admin/`). Earlier draft passed the tab URL verbatim to
-  `chrome.cookies.get` / `.remove`, which silently missed cookies whose
-  path didn't fall under the tab's pathname. The URL is now rebuilt with
-  the profile's configured path before each call. Unit-tested.
+- Fixed cookie handling for pages with non-root paths.
 
 ### Security
 
-- **Cross-tab cookie spoofing guard**. The service-worker `COOKIES_GET` /
-  `COOKIES_SET` / `COOKIES_REMOVE` handlers now require
-  `sender.tab?.id === message.tabId` whenever the sender is a content
-  script. Without this, a hypothetically-compromised content script could
-  have called `chrome.runtime.sendMessage` with an arbitrary `tabId` and
-  asked the SW to read or overwrite `httpOnly` auth cookies on a
-  completely unrelated tab. Privileged extension-context senders (the
-  DevTools panel, the popup) still accept any `tabId` since they know the
-  inspected tab via `chrome.devtools.inspectedWindow.tabId`. Defense in
-  depth — Chrome MV3 already restricts cross-extension messaging without
-  `externally_connectable`, but the guard removes one whole class of
-  threat from the model. Unit-tested.
-- **`MUTATE_STATE` restricted to extension contexts.** Content scripts
-  can no longer send a `replaceState` mutation to overwrite the user's
-  persisted rules, groups, and profiles wholesale.
+- Added protections so one browser tab can't read or change another tab's
+  cookies through the extension.
+- Restricted a sensitive settings-import action to trusted extension
+  screens only.
 
 ## [0.4.0] - 2026-05-30
 
 ### Added
 
-- **Storage profiles** — a new pair of DevTools panel tabs (**Storage** and
-  **Storage Editor**) that let you flip values on the inspected page's
-  `localStorage` from a chip selector. Define a profile once (name, key,
-  list of candidate values like `en_GB` / `de_DE`); the Storage tab reads
-  the current value from the inspected page, shows it inline, and lets you
-  switch to any candidate with one click. New UI pref **Auto-reload after
-  switch** opts in to reloading the inspected page after each value
-  change; otherwise a manual **Reload page** button is provided. Driven by
-  `chrome.devtools.inspectedWindow.eval` from the panel — no service-worker
-  changes on the eval path; profiles persist in `chrome.storage.local`
-  with the same plumbing as rules.
-- `StorageProfile` is round-tripped through Export / Import — bundles
-  without a `storageProfiles` key (pre-0.4.0 exports) still import cleanly.
-- **Storage profiles in Settings → Export / Import.** The selection tree
-  in the Settings tab now lists storage profiles as a "Storage profiles"
-  section below the rule groups, with the same per-item checkbox UX,
-  Select-all behaviour, and conflict resolution (`Overwrite` /
-  `Rename as new`) as rules. Previously profiles were silently auto-included
-  in every export and import; now they're explicit.
-- **Value wrapping (prefix / suffix) in the Storage Editor.** Two
-  progressive-disclosure buttons — **+ Add prefix** and **+ Add suffix** —
-  reveal text inputs that wrap every value before it lands in
-  `localStorage`. Common case: `prefix = "` and `suffix = "` so JSON-quoted
-  values like `"en_GB"` are written correctly. The Storage tab chips now
-  display the **wrapped** value (what actually gets stored), and the
-  current-value `is-active` highlight compares against the wrapped form.
-  A live preview under the editor shows `prefix + <first value> + suffix`.
+- New Storage Profiles — save localStorage values for the current page and
+  switch between them with one click.
+- Storage profiles are now included in Export/Import.
+- Optional prefix/suffix wrapping for storage values.
 
 ### Fixed
 
-- Soft-migration for new `AppState` fields. The legacy `migrate()` path
-  used to call `defaultState()` on any schema mismatch, which would have
-  wiped every user's rules the next time the schema changed. Migration is
-  now additive — missing optional fields are normalised (e.g.
-  `storageProfiles` defaults to `[]`) and existing data is preserved.
-- Friendly empty-state on the Storage tab when the panel is opened as a
-  standalone extension page (`chrome-extension://…/panel.html`) instead of
-  inside DevTools. Previously the row showed the raw exception
-  `Cannot read properties of undefined (reading 'inspectedWindow')`; now
-  it shows a banner explaining that the feature needs the DevTools host
-  and points the user to **Right-click → Inspect → Phantom Mock**. Chips
-  and the reload / refresh buttons are disabled in this mode so they
-  can't trigger the same error.
+- Fixed a bug where certain updates could wipe out existing rules.
+- Friendlier message when using Storage features outside of DevTools.
 
 ## [0.3.0] - 2026-05-29
 
 ### Added
 
-- `npm run build:local` and `npm run package:local` produce a side-by-side
-  unpacked build whose manifest name is **Phantom Mock - Local** (and whose
-  toolbar tooltip ends in `(Local)`). Loading `dist/` from a local checkout
-  no longer collides with the published Chrome Web Store extension in
-  `chrome://extensions` — both can be enabled at the same time. The
-  packaged zip is suffixed `phantom-mock-local-X.Y.Z.zip` so it can't
-  clobber the production artifact. Driven by Vite `--mode unpacked` (the
-  name `local` is reserved by Vite for `.env.local`); no duplicate
-  manifest file is maintained.
-- New **Debug** tab in the DevTools panel surfaces the live state of
-  `chrome.declarativeNetRequest`: currently-registered dynamic rules,
-  what the current app state translates to, the last sync error (if any),
-  and a **Test against URL** form that calls
-  `chrome.declarativeNetRequest.testMatchOutcome` so the user can ask
-  "would this URL match any of my header rules?" without re-loading a real
-  page. New `GET_DNR_DEBUG` and `TEST_DNR_MATCH` runtime messages route
-  through the service worker.
-- **Live DNR matches** feed in the Debug tab. Subscribes to
-  `chrome.declarativeNetRequest.onRuleMatchedDebug` (we already declare the
-  `declarativeNetRequestFeedback` permission) and shows every header-rule
-  fire in real time, with method, URL, rule name (resolved from the DNR
-  integer id back to the user's rule), and timestamp. Backed by a new
-  `src/background/dnr-match-log.ts` module mirroring the Hit Log's
-  port-based buffer pattern, plus `CLEAR_DNR_MATCH_LOG` runtime message.
-  Solves the "did my rule fire or not?" question that previously required
-  reading network curls. Capped at 200 entries.
-- **Header-rule scope warning** in the Rule Editor. When a header rule's
-  method is not `*` (e.g. POST-only), an inline warning under the Method
-  picker explains that redirected GETs and other verbs will NOT get the
-  header — with a one-click **Set to \*** button. Catches the most common
-  scoping mistake (login POST → 302 → GET to a redirect target that needs
-  the same header) at authoring time. Mock rules are unaffected.
+- Local builds can now be installed side-by-side with the Chrome Web
+  Store version without conflicts.
+- New Debug tab to help troubleshoot header rules.
+- Live view of header rules firing in real time.
+- A warning in the rule editor when a header rule might not apply after a
+  redirect.
 
 ### Fixed
 
-- Header overwrite rules silently failed for some rule IDs.
-  `ruleIdFor()` in [`src/background/rules-dnr.ts`](src/background/rules-dnr.ts)
-  computed `hashStringToInt(rule.id) % 2_000_000_000`, which could land on
-  `0`. `chrome.declarativeNetRequest.updateDynamicRules` rejects IDs less
-  than 1 with `"id must be >= 1"` and discards the whole batch — so a
-  single unlucky rule made _every_ header rule disappear with no
-  user-visible signal. Now clamped to the range `1..1_999_999_999` (still
-  inside DNR's 32-bit signed-int ceiling). Unit-tested.
-- The service worker no longer swallows
-  `chrome.declarativeNetRequest.updateDynamicRules` failures. Each of the
-  three sync paths (`onInstalled`, `onStartup`, and the storage
-  `subscribe` callback) now routes through `syncDnrWithDiagnostics`,
-  which logs the failure with the offending translated rule JSON to the
-  service-worker console and stashes the message + payload so the new
-  Debug tab can show it.
+- Fixed a bug where some header rules could silently fail to apply.
+- Rule sync failures are now logged instead of failing silently.
 
 ## [0.2.0] - 2026-05-23
 
 ### Added
 
-- Multi-select rules in the Rules tab. Each rule row now has a small
-  selection checkbox at the far left (in the accent colour, scaled slightly
-  smaller than the enable / disable checkbox so the two are visually
-  distinct). Each group header has its own select-all checkbox with
-  tri-state (none / some / all selected) indicating how many of its rules
-  are picked. When any rule is selected, a bulk-action bar appears showing
-  the count plus **Clear selection** and **Delete selected** buttons. Bulk
-  delete asks for one confirmation, then issues one `deleteRule` mutation
-  per id. State is session-only; stale ids are pruned automatically if the
-  rule list changes underneath the user.
-- Collapse / expand groups, in both the DevTools panel's **Rules** tab and
-  the toolbar **popup**:
-  - A chevron on the left of each group header toggles just that group.
-  - **Expand all** / **Collapse all** buttons fold every group at once
-    (in the Rules-tab toolbar and a thin sub-bar at the top of the popup).
-  - State is per-panel-session / per-popup-open (not persisted).
-  - Group rule-count badge shown next to the group name.
+- Multi-select and bulk delete for rules.
+- Collapse/expand groups in the Rules tab and popup.
 
 ### Fixed
 
-- Service worker no longer fails to register with "Status code: 15". The
-  background entry point was renamed from `src/background/index.ts` to
-  `src/background/service-worker.ts` so `@crxjs/vite-plugin@2.4` can no
-  longer collide its chunk with `src/content/index.ts` (both used to share
-  the basename `index.ts` and CRXJS would route the SW loader to the
-  content-script bundle, which then crashed because service workers don't
-  have `document`).
-- Header rules now also apply to `main_frame` and `sub_frame` requests, not
-  just `xmlhttprequest`. Previously, custom headers like `X-Tenant-ID`
-  configured in a header rule were silently dropped on page navigations and
-  iframe loads — they only worked on fetch/XHR. Mock rules are unaffected
-  (they still run through the page-world `fetch` / `XMLHttpRequest` patcher
-  and inherently only see those two API types).
-- Empty header rows in the Rule Editor are stripped on save. A half-filled
-  row (`{ name: "", op: "set", value: "" }`) could previously survive into
-  the persisted rule and cause `chrome.declarativeNetRequest` to silently
-  reject the entire rule.
-- JSON import now silently drops header rows with an empty `name` instead of
-  rejecting the whole bundle. Old export files that pre-date the editor
-  strip-on-save fix can now be re-imported without manual JSON editing.
-- Import-conflict resolution per rule: when "Merge by id" is selected, any
-  incoming **rule** whose `id` already exists in the current state is flagged
-  with a `⚠ already exists` badge in the preview tree, with inline
-  **Overwrite** / **Rename as new** radios. Defaults to **Overwrite** (legacy
-  behaviour); selecting **Rename as new** keeps the existing rule and adds
-  the imported one with a fresh `id` and an auto-incremented name suffix
-  (`MyRule` → `MyRule (2)` → `MyRule (3)` …). **Groups** with a colliding
-  `id` are silently merged into the existing group — the user's group name,
-  enabled flag, and order are preserved, and imported rules just land inside
-  the existing group. Implemented in `applyImportWithResolutions` /
-  `detectConflicts` in `import-export.ts`.
+- Fixed an extension loading error.
+- Header rules now apply to page loads too, not just background requests.
+- Cleaned up invalid rule data left behind by saving or importing.
+- Better handling of conflicting rules/groups when importing.
 
 ### Changed
 
-- Master switch in the popup and DevTools panel is now a sliding pill toggle
-  instead of a native checkbox. Behaviour identical (`checked` state still
-  binds to `state.masterEnabled`); CSS-only via a new `.pm-toggle` class.
-- Per-group and per-rule **enable/disable** checkboxes in both the popup and
-  the DevTools panel's Rules tab are now compact toggle pills
-  (`.pm-toggle.pm-toggle-sm` — 26-28 px wide), so the visual language is
-  consistent across master, group and rule level. The bulk-select checkbox
-  in the Rules tab stays a standard square checkbox so it's visually
-  distinct from the enable toggles.
-- Upgraded React from 18.3 to 19.2, including `@types/react` and
-  `@types/react-dom`. Added explicit `type JSX` imports across components
-  (`panel.tsx`, `popup/main.tsx`, `RuleEditor`, `RulesTable`, `Capture`,
-  `PromoteToRule`, `HitLog`, `JsonTreeView`, `Settings`) to match React 19's
-  JSX-namespace changes.
-- Upgraded the Vite toolchain: Vite 5.4 → 8.0, `@vitejs/plugin-react` 4.3 →
-  6.0, `vitest` 2.1 → 4.1, `@vitest/coverage-v8` 2.1 → 4.1.
-- Upgraded ESLint stack: `eslint` 9.15 → 10.4, `@eslint/js` 9.15 → 10.0,
-  `eslint-plugin-react-hooks` 5.0 → 7.1, `eslint-plugin-react-refresh` 0.4 →
-  0.5, `eslint-config-prettier` 9.1 → 10.1, `@typescript-eslint/*` 8.15 →
-  8.59.
-- Upgraded `@types/chrome` to 0.1.42.
-- CI now runs the test matrix on Node 20 and 22 (was 18 and 20).
-- `dependabot.yml` now groups Vite-related packages so version bumps come in
-  a single coordinated PR.
+- Master switch and other toggles redesigned as sliding switches.
+- Updated underlying libraries.
 
 ## [0.1.3] - 2026-05-18
 
 ### Changed
 
-- Removed the `scripting` permission from `manifest.json` and from all
-  store-listing copy. The permission was declared but never used at runtime
-  (page-world script injection is handled by the `content_scripts` entry
-  with `"world": "MAIN"`, which doesn't require this permission). Removed
-  to comply with Chrome Web Store policy (rejection code "Purple
-  Potassium"); the resubmission passed.
+- Removed an unused permission to comply with Chrome Web Store policy.
 
 ## [0.1.1] - 2026-05-17
 
 ### Added
 
-#### Core mocking
-
-- Response mocking for REST APIs (`fetch` + `XMLHttpRequest`) via a page-world
-  content script registered with `world: "MAIN"`, so it runs before page
-  scripts at `document_start`.
-- URL match types: `exact`, `contains`, and `regex`, plus per-method filtering
-  (wildcard `*` supported).
-- Per-rule controls: status code, response delay, response body, content-type,
-  custom response headers, and a "log to Hit Log" flag.
-- Header overwrite rules via `chrome.declarativeNetRequest` dynamic rules —
-  `set` / `append` / `remove` on both request and response headers, scoped to
-  `xmlhttprequest` resource type (REST-only).
-- Group management with cascading enable/disable for all rules inside.
-- Master kill switch surfaced in both the popup and the DevTools panel.
-- In-page toast notification when a mock rule fires (truncated rule name,
-  rendered in an isolated Shadow DOM so it can't conflict with page CSS).
-  Opt-in via Settings.
-
-#### DevTools panel "Phantom Mock"
-
-- **Rules** tab — grouped rule list with toggles, rename, delete, edit, clone.
-- **Editor** tab — full CRUD form. Inline "+ New" button on the group select to
-  create a group without leaving the form. Live regex / JSON / status-code /
-  delay validation. "Test against URL" field for matcher preview.
-- **Hit Log** tab — live tail of mocked requests via a long-lived port to the
-  service worker; filterable, clearable.
-- **Capture** tab — listens to `chrome.devtools.network.onRequestFinished` from
-  `devtools.ts` (so capturing starts the instant DevTools opens), buffered in
-  `chrome.storage.session`. Host filter, record/stop toggle, Import from
-  Network HAR log, Reload page, Clear. Rows are grouped by registrable domain
-  then subdomain (collapsible). Customizable columns (time, method, status,
-  path, size, duration) via a Columns dropdown.
-- **Capture → Promote to rule** — click any captured request to open a side
-  pane with checkboxes for each field (status, content-type, response body,
-  individual request/response headers) and one-click pattern presets (Use
-  path / Use full URL / Use host). Result is saved via the same `upsertRule`
-  flow as the manual editor.
-- **Settings** tab — Appearance (font size: small / normal / big / custom px),
-  Notifications (toast on/off), Export (checkbox tree, selective), Import
-  (checkbox tree preview, merge strategies: replace / merge-by-id /
-  append-as-new).
-- Collapsible JSON tree view in the response body editor with **Edit/Tree**
-  mode toggle, Expand all / Collapse all, Pretty/Minify/Copy, and editable
-  primitives in tree mode (click a string/number/null to edit, click a
-  boolean to toggle).
-
-#### Popup
-
-- 360px React popup with master switch.
-- Rules grouped by **registrable domain → subdomain → path** (mirrors the
-  capture-tab layout). HTTPS / HTTP / other shown as a lock icon — never as
-  raw protocol text.
-
-#### Debug helpers (page console)
-
-- `window.__phantomMock.installed` / `fetchPatched` / `masterEnabled` /
-  `ruleCount` / `rules()` / `test(url, method)` / `setVerbose(true)` —
-  inspect runtime state and trace match decisions from the page's console.
-- Install-time `[phantom-mock] installed on <url>` log so users can confirm
-  the patch loaded.
-
-#### Engineering
-
-- Vite + CRXJS build pipeline; strict TypeScript; named-exports-only.
-- CI workflows: `ci` (lint, format, typecheck, tests, build on Node 18/20),
-  `auto-assign-author` (PR author auto-assignment), `security-audit` (weekly
-  `npm audit`, also gated on dependency-changing PRs), and `release`
-  (tag-driven build, zip package, GitHub Release, optional Chrome Web Store
-  publish).
-- Husky pre-commit hook running `lint-staged`.
-- `.github/dependabot.yml` for weekly npm + GitHub-Actions updates.
-- Ghost-silhouette extension icon set (16/32/48/128).
-- Chrome Web Store submission assets: `PRIVACY.md`, `store-assets/listing.md`,
-  `store-assets/SUBMISSION-CHECKLIST.md`, placeholder screenshots and promo
-  tile.
+- First full release: mock API responses, capture and replay network
+  traffic, manage rules and groups, in-page notifications, and a full
+  DevTools panel (Rules, Editor, Hit Log, Capture, Settings).
+- Browser toolbar popup with a master on/off switch.
+- Debug helpers for advanced users.
 
 ### Submission notes
 
-- First Chrome Web Store submission. **Rejected** by automated review for
-  declaring the `scripting` permission without using it ("Purple Potassium"
-  violation). Never publicly available. Fixed in 0.1.3.
+- First Chrome Web Store submission was rejected over an unused
+  permission; fixed in 0.1.3.
 
 ## [0.1.0] - 2026-05-17
 
 ### Added
 
-- Initial scaffold of the Phantom Mock Chrome MV3 extension. Never submitted
-  to the Chrome Web Store. All user-facing features arrived in 0.1.1.
+- Initial project setup.
+
+[Unreleased]: https://github.com/AlirezaSoltaniJazi/phantom-mock/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/AlirezaSoltaniJazi/phantom-mock/releases/tag/v0.7.0
