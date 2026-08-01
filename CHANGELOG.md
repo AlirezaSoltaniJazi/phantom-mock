@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.1] - 2026-08-01
+
 ### Changed
 
 - Behind-the-scenes improvements to how new versions are released, so
@@ -177,5 +179,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Initial project setup.
 
-[Unreleased]: https://github.com/AlirezaSoltaniJazi/phantom-mock/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/AlirezaSoltaniJazi/phantom-mock/compare/v0.7.1...HEAD
+[0.7.1]: https://github.com/AlirezaSoltaniJazi/phantom-mock/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/AlirezaSoltaniJazi/phantom-mock/releases/tag/v0.7.0
