@@ -5,6 +5,8 @@ All notable changes to Phantom Mock are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
 ## [0.7.0] - 2026-06-14
 
 ### Added
@@ -488,3 +490,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Initial scaffold of the Phantom Mock Chrome MV3 extension. Never submitted
   to the Chrome Web Store. All user-facing features arrived in 0.1.1.
+
+[Unreleased]: https://github.com/AlirezaSoltaniJazi/phantom-mock/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/AlirezaSoltaniJazi/phantom-mock/releases/tag/v0.7.0
