@@ -2,17 +2,17 @@
 
 ## What This Is
 
-Chrome extension (Manifest V3) that mocks REST API responses and intercepts HTTP requests directly in the browser. Developers use the DevTools panel to define URL-matching rules, capture live network traffic, and return mock responses — without touching backend code or proxies. Built with TypeScript 5.6 strict, React 18, Vite + CRXJS.
+Chrome extension (Manifest V3) that mocks REST API responses and intercepts HTTP requests directly in the browser. Developers use the DevTools panel to define URL-matching rules, capture live network traffic, and return mock responses — without touching backend code or proxies. Built with TypeScript 6.0 strict, React 19, Vite + CRXJS.
 
 ## Stack
 
 | Layer    | Technology                                       |
 | -------- | ------------------------------------------------ |
-| Language | TypeScript 5.6 (strict, no `any`)                |
-| UI       | React 18.3                                       |
-| Build    | Vite 5.4 + @crxjs/vite-plugin 2.0                |
-| Test     | Vitest 2.1 + happy-dom                           |
-| Lint     | ESLint 9 (flat config) + Prettier 3.3            |
+| Language | TypeScript 6.0 (strict, no `any`)                |
+| UI       | React 19.2                                       |
+| Build    | Vite 8.0 + @crxjs/vite-plugin 2.6                |
+| Test     | Vitest 4.1 + happy-dom                           |
+| Lint     | ESLint 10 (flat config) + Prettier 3.3           |
 | Runtime  | Chrome Extension Manifest V3                     |
 | Storage  | chrome.storage.local (typed wrappers)            |
 | Network  | declarativeNetRequest (DNR) + fetch/XHR patching |
@@ -32,7 +32,7 @@ src/
 └── utils/               # ID generation, helpers
 tests/                   # Vitest tests mirroring src/ structure
 docs/                    # Architecture, modules, dataflow, extending, troubleshooting
-scripts/                 # bump-version.mjs, zip-extension.mjs
+scripts/                 # bump-version.mjs, changelog.mjs, zip-extension.mjs
 public/icons/            # Extension icons (16/32/48/128)
 .data/skills/            # AI skill definitions and reference guides
 ```
@@ -74,15 +74,15 @@ npm run package
 
 ### Naming Conventions
 
-| Entity             | Style                | Example                               |
-| ------------------ | -------------------- | ------------------------------------- |
-| Files (modules)    | kebab-case           | `rules-dnr.ts`, `use-prefs.ts`        |
-| Files (components) | PascalCase           | `RuleEditor.tsx`, `HitLog.tsx`        |
-| Types/Interfaces   | PascalCase           | `Rule`, `AppState`, `MockAction`      |
-| Constants          | SCREAMING_SNAKE      | `MESSAGE_TYPES`, `STORAGE_KEYS`       |
-| Functions/vars     | camelCase            | `getState()`, `specMatches()`         |
-| Booleans           | is/has/should prefix | `isRuleActive()`, `hasPermission`     |
-| IDs                | prefixed UUID        | `rule_`, `grp_`, `cap_` via `newId()` |
+| Entity             | Style                | Example                                                   |
+| ------------------ | -------------------- | --------------------------------------------------------- |
+| Files (modules)    | kebab-case           | `rules-dnr.ts`, `use-prefs.ts`                            |
+| Files (components) | PascalCase           | `RuleEditor.tsx`, `HitLog.tsx`                            |
+| Types/Interfaces   | PascalCase           | `Rule`, `AppState`, `MockAction`                          |
+| Constants          | SCREAMING_SNAKE      | `MESSAGE_TYPES`, `STORAGE_KEYS`                           |
+| Functions/vars     | camelCase            | `getState()`, `specMatches()`                             |
+| Booleans           | is/has/should prefix | `isRuleActive()`, `hasPermission`                         |
+| IDs                | prefixed UUID        | `rule_`, `grp_`, `cap_`, `sprof_`, `cprof_` via `newId()` |
 
 ### Import Order
 
@@ -110,7 +110,7 @@ Never use deep relative paths (`../../`) — always use `@/` aliases.
 
 ## Architecture Rules
 
-- **Service worker is the single source of truth** — all state mutations flow through `background/index.ts`
+- **Service worker is the single source of truth** — all state mutations flow through `background/service-worker.ts`
 - **Immutable state updates only** — spread operator, `upsertById()` helper, never mutate in-place
 - **Typed discriminated unions for messages** — `RuntimeMessage` uses `type` field, `StateMutation` uses `kind` field
 - **declarativeNetRequest for header rules** — never webRequest blocking API
@@ -122,7 +122,7 @@ Never use deep relative paths (`../../`) — always use `@/` aliases.
 
 | File                                     | Purpose                                                         |
 | ---------------------------------------- | --------------------------------------------------------------- |
-| `src/background/index.ts`                | Message hub — handles all runtime messages, applies mutations   |
+| `src/background/service-worker.ts`       | Message hub — handles all runtime messages, applies mutations   |
 | `src/background/storage.ts`              | Typed chrome.storage.local wrapper with subscribe pattern       |
 | `src/background/rules-dnr.ts`            | Translates rules → declarativeNetRequest format                 |
 | `src/shared/types.ts`                    | All core types: Rule, Group, AppState, MockAction, HeaderAction |
@@ -158,7 +158,7 @@ export type RuntimeMessage =
   | { type: typeof MESSAGE_TYPES.MY_NEW_ACTION; payload: MyPayload }
   // ... existing
 
-// 3. Handle in src/background/index.ts switch
+// 3. Handle in src/background/service-worker.ts switch
 case MESSAGE_TYPES.MY_NEW_ACTION:
   handleMyAction(message.payload)
     .then((result) => sendResponse({ ok: true, value: result }))
@@ -222,7 +222,7 @@ export function MyComponent({ rules, onAction }: Props): JSX.Element {
 - **Framework**: Vitest + happy-dom (not Jest)
 - **Structure**: `tests/` mirrors `src/` directory layout
 - **Chrome mocks**: Global setup in `tests/setup.ts` — auto-mocks all chrome.\* APIs
-- **Run**: `npm test` (watch mode), `npm run test -- --run` (single pass)
+- **Run**: `npm test` (single pass via `vitest run`); `npx vitest` for watch mode
 - **Coverage**: V8 provider, text + lcov reporters
 - **Targets**: 80%+ coverage for service worker, 90%+ for message handlers
 - **Conventions**: Factory functions (`makeMockRule()`) for test data, `describe`/`it` blocks
@@ -237,10 +237,10 @@ export function MyComponent({ rules, onAction }: Props): JSX.Element {
 
 ## Known Gotchas
 
-- **`src/shared/types.ts` and `src/shared/messages.ts` must stay in sync** — adding a message type requires updating both files plus the handler in `background/index.ts`
+- **`src/shared/types.ts` and `src/shared/messages.ts` must stay in sync** — adding a message type requires updating both files plus the handler in `background/service-worker.ts`
 - **`return true` in message listeners** — forgetting this makes async `sendResponse` fail silently
 - **CRXJS HMR quirks** — service worker doesn't auto-reload; manually reload extension after background changes
-- **DNR rule ID limits** — IDs must be positive integers; `hashIdForDnr()` in `utils/id.ts` handles conversion from string UUIDs
+- **DNR rule ID limits** — IDs must be positive integers; `ruleIdFor()` in `background/rules-dnr.ts` converts string rule UUIDs via `hashStringToInt()` from `utils/id.ts`
 - **Page-world script runs at `document_start`** — DOM not available, only fetch/XHR patching
 - **`exactOptionalPropertyTypes` is ON** — can't assign `undefined` to optional props, must omit the key entirely
 - **Content script is bridge only** — never put matching logic or state there; it relays between page world and service worker

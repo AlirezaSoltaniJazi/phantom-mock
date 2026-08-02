@@ -11,7 +11,7 @@ sequenceDiagram
     participant User
     participant Panel as panel.tsx
     participant Hook as state-hook.ts
-    participant SW as background/index.ts
+    participant SW as background/service-worker.ts
     participant Store as background/storage.ts
     participant DNR as background/rules-dnr.ts
     participant CS as content/index.ts
@@ -35,10 +35,10 @@ sequenceDiagram
 
 1. **Entry**: `devtools/panel.tsx` — user clicks Save, calls `mutate()` from `useAppState()`
 2. **Hook**: `devtools/state-hook.ts::mutate()` — sends `MUTATE_STATE` message via `chrome.runtime.sendMessage()`
-3. **Service worker**: `background/index.ts` — `applyMutation()` processes the mutation (upsertRule, deleteRule, toggleRule, etc.) and calls `updateState()`
+3. **Service worker**: `background/service-worker.ts` — `applyMutation()` processes the mutation (upsertRule, deleteRule, toggleRule, etc.) and calls `updateState()`
 4. **Storage**: `background/storage.ts::setState()` — writes to `chrome.storage.local`, triggers `onChanged` listener
 5. **DNR sync**: `background/rules-dnr.ts::syncDnrRules()` — translates header-type rules to DNR format, calls `chrome.declarativeNetRequest.updateDynamicRules()`
-6. **Broadcast**: `background/index.ts::broadcastRulesUpdated()` — sends `RULES_UPDATED` to all tabs via `chrome.tabs.sendMessage()`
+6. **Broadcast**: `background/service-worker.ts::broadcastRulesUpdated()` — sends `RULES_UPDATED` to all tabs via `chrome.tabs.sendMessage()`
 7. **Content script**: `content/index.ts` — receives `RULES_UPDATED`, calls `postRulesToPage()` which sends rules via `window.postMessage()`
 8. **Page world**: `injected/page-mock.ts` — receives message, updates in-memory `cache` with new rules/groups/masterEnabled
 
@@ -52,7 +52,7 @@ sequenceDiagram
     participant PW as injected/page-mock.ts
     participant CS as content/index.ts
     participant Toast as content/toast.ts
-    participant SW as background/index.ts
+    participant SW as background/service-worker.ts
     participant Log as background/log.ts
     participant DT as DevTools HitLog
 
@@ -89,7 +89,7 @@ sequenceDiagram
     participant Hook as capture/use-capture.ts
     participant UI as capture/Capture.tsx
     participant Promote as capture/PromoteToRule.tsx
-    participant SW as background/index.ts
+    participant SW as background/service-worker.ts
 
     Page->>Network: HTTP request completes
     Network->>DT: onRequestFinished(entry)
@@ -110,3 +110,39 @@ sequenceDiagram
 5. **UI**: `capture/Capture.tsx` renders entries in a filterable grid with domain/subdomain grouping
 6. **Promote**: user clicks "Promote to Rule" — `PromoteToRule.tsx` converts `CapturedEntry` fields to a `Rule` with field checkboxes and pattern presets
 7. **Save**: promoted rule is sent as `MUTATE_STATE` to service worker, follows Pipeline 1 from step 3 onward
+
+## Pipeline 4: Switch a Storage or Cookie profile value
+
+User opens the Storage or Cookies tab and clicks a candidate value chip for a profile.
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant Tab as StorageTab.tsx / CookiesTab.tsx
+    participant Inspected as inspected-window.ts / cookies.ts
+    participant SW as background/service-worker.ts
+    participant CookiesAPI as chrome.cookies
+    participant Page as Inspected Page
+
+    User->>Tab: Click a value chip
+    Tab->>Tab: wrapValue(profile, value) — apply prefix/suffix
+    alt Storage profile
+        Tab->>Inspected: setLocalStorage(key, value)
+        Inspected->>Page: chrome.devtools.inspectedWindow.eval(...)
+    else Cookie profile
+        Tab->>Inspected: setCookieValue(name, value, path)
+        Inspected->>SW: sendMessage(COOKIES_SET)
+        SW->>SW: tabIdMatchesSender() guard
+        SW->>CookiesAPI: chrome.cookies.set(...)
+    end
+    Tab->>Tab: update displayed current value
+    opt autoReloadOnStorageSwitch / auto-reload preference
+        Tab->>Page: reloadInspectedPage()
+    end
+```
+
+1. **Entry**: `devtools/components/StorageTab.tsx` or `devtools/components/CookiesTab.tsx` — user clicks a value chip for an enabled profile
+2. **Wrap**: `wrapValue()` applies the profile's optional `prefix`/`suffix` around the raw value
+3. **Storage path**: `devtools/inspected-window.ts::setLocalStorage()` runs `window.localStorage.setItem(...)` in the inspected page via `chrome.devtools.inspectedWindow.eval()`
+4. **Cookie path**: `devtools/cookies.ts::setCookieValue()` sends `COOKIES_SET` to the service worker; `background/service-worker.ts` checks `tabIdMatchesSender()` before calling `background/cookies.ts::setCookie()`, which resolves the tab's URL and calls `chrome.cookies.set()`
+5. **Reload**: if the auto-reload preference is on, `reloadInspectedPage()` reloads the inspected tab so the new value takes effect

@@ -19,9 +19,12 @@ Phantom Mock is a developer-focused Chrome extension that lets you intercept
 REST API traffic, override headers, and flip web-storage values right
 inside the browser — without spinning up a separate mock server.
 
-**Mock response bodies.** Match a URL by exact value, substring, or regex,
-optionally narrowed to a specific HTTP method, and reply with a status code,
-custom delay, content-type, and response body of your choice.
+**Mock response bodies.** Match a URL by exact value, substring, regex, or a
+`{random}` template (so one rule can cover a whole family of dynamic URLs,
+like ones containing an ID), optionally narrowed to a specific HTTP method,
+and reply with a status code, custom delay, content-type, and response body
+of your choice — response bodies can include auto-generated random values
+too.
 
 **Override headers.** Add, set, append, or remove arbitrary request or
 response headers using the same URL matching, backed by Chrome's native

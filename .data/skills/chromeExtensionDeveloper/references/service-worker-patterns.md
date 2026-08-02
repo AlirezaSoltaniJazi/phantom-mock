@@ -9,7 +9,7 @@
 The MV3 service worker can terminate at any time. Design for statelessness:
 
 ```typescript
-// src/background/index.ts
+// src/background/service-worker.ts
 
 // ✅ Correct — event listeners at top level (registered synchronously)
 chrome.runtime.onInstalled.addListener(handleInstalled);
@@ -43,7 +43,7 @@ export async function getState(): Promise<ExtensionState> {
 }
 
 export async function setState(
-  updater: (current: ExtensionState) => ExtensionState,
+  updater: (current: ExtensionState) => ExtensionState
 ): Promise<void> {
   const current = await getState();
   const next = updater(current);
@@ -73,11 +73,9 @@ function getDefaultState(): ExtensionState {
 ## Installation & Update Handlers
 
 ```typescript
-// src/background/index.ts
+// src/background/service-worker.ts
 
-async function handleInstalled(
-  details: chrome.runtime.InstalledDetails,
-): Promise<void> {
+async function handleInstalled(details: chrome.runtime.InstalledDetails): Promise<void> {
   switch (details.reason) {
     case 'install':
       await initializeExtension();
@@ -127,9 +125,7 @@ async function handleAlarm(alarm: chrome.alarms.Alarm): Promise<void> {
 async function removeExpiredRules(): Promise<void> {
   const rules = await getRules();
   const now = Date.now();
-  const activeRules = rules.filter(
-    (rule) => !rule.expiresAt || rule.expiresAt > now,
-  );
+  const activeRules = rules.filter((rule) => !rule.expiresAt || rule.expiresAt > now);
 
   if (activeRules.length !== rules.length) {
     await setRules(activeRules);
@@ -149,7 +145,7 @@ async function removeExpiredRules(): Promise<void> {
 import type { MockRule } from '@/shared/types';
 
 export async function syncDeclarativeNetRequestRules(
-  rules: MockRule[],
+  rules: MockRule[]
 ): Promise<{ success: boolean; error?: string }> {
   try {
     // Get current dynamic rules
@@ -157,9 +153,7 @@ export async function syncDeclarativeNetRequestRules(
     const removeRuleIds = existingRules.map((r) => r.id);
 
     // Convert our rules to declarativeNetRequest format
-    const addRules = rules
-      .filter((r) => r.enabled)
-      .map(toDeclarativeNetRequestRule);
+    const addRules = rules.filter((r) => r.enabled).map(toDeclarativeNetRequestRule);
 
     // Atomic update — remove old, add new
     await chrome.declarativeNetRequest.updateDynamicRules({
@@ -176,9 +170,7 @@ export async function syncDeclarativeNetRequestRules(
   }
 }
 
-function toDeclarativeNetRequestRule(
-  rule: MockRule,
-): chrome.declarativeNetRequest.Rule {
+function toDeclarativeNetRequestRule(rule: MockRule): chrome.declarativeNetRequest.Rule {
   return {
     id: rule.id,
     priority: rule.priority ?? 1,

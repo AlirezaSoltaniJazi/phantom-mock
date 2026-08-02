@@ -22,7 +22,7 @@ export const MESSAGE_TYPES = {
   STATUS_RESPONSE: 'STATUS_RESPONSE',
 } as const;
 
-export type MessageType = typeof MESSAGE_TYPES[keyof typeof MESSAGE_TYPES];
+export type MessageType = (typeof MESSAGE_TYPES)[keyof typeof MESSAGE_TYPES];
 
 // Request messages (popup/content -> background)
 export interface AddRuleMessage {
@@ -67,9 +67,7 @@ export type ExtensionMessage =
 ```typescript
 // src/shared/messages.ts — helper function
 
-export async function sendMessage<T>(
-  message: ExtensionMessage,
-): Promise<MessageResponse<T>> {
+export async function sendMessage<T>(message: ExtensionMessage): Promise<MessageResponse<T>> {
   try {
     const response = await chrome.runtime.sendMessage(message);
     if (chrome.runtime.lastError) {
@@ -103,7 +101,7 @@ if (response.success) {
 ## Receiving Messages (Background Service Worker)
 
 ```typescript
-// src/background/index.ts
+// src/background/service-worker.ts
 
 import { type ExtensionMessage, MESSAGE_TYPES } from '@/shared/messages';
 
@@ -111,7 +109,7 @@ chrome.runtime.onMessage.addListener(
   (
     message: ExtensionMessage,
     sender: chrome.runtime.MessageSender,
-    sendResponse: (response: MessageResponse) => void,
+    sendResponse: (response: MessageResponse) => void
   ) => {
     // Type guard — reject unknown messages
     if (!message || !message.type || !(message.type in MESSAGE_TYPES)) {
@@ -130,12 +128,12 @@ chrome.runtime.onMessage.addListener(
       });
 
     return true; // Keep message channel open for async response
-  },
+  }
 );
 
 async function handleMessage(
   message: ExtensionMessage,
-  sender: chrome.runtime.MessageSender,
+  sender: chrome.runtime.MessageSender
 ): Promise<MessageResponse> {
   switch (message.type) {
     case MESSAGE_TYPES.ADD_RULE:
