@@ -28,7 +28,7 @@ Conventions to check:
 - Path aliases (@/) — no deep relative imports (../../)
 - Shadow DOM for injected UI — no global CSS pollution
 - chrome.storage typed wrappers — no raw chrome.storage.get/set
-- Result objects { success, data?, error? } — not exceptions
+- Result objects { ok: true, value } | { ok: false, error } — not exceptions
 - Service worker event listeners at top level — never conditional
 - Explicit return types on exported functions
 

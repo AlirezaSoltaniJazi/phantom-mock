@@ -65,3 +65,37 @@ export async function sendMessage<T>(message: RuntimeMessage): Promise<T> {
     });
   });
 }
+
+// Once the extension is reloaded, updated, or disabled, any script that was
+// already running (an orphaned content script, or a DevTools panel left open
+// across the reload) has `chrome.runtime.id` become undefined, and any
+// `chrome.*` call throws "Extension context invalidated" — SYNCHRONOUSLY, so
+// a trailing `.catch()` can't swallow it. Check this before any runtime call.
+export function isExtensionContextValid(): boolean {
+  try {
+    return Boolean(chrome.runtime?.id);
+  } catch {
+    return false;
+  }
+}
+
+// Opens a long-lived port, returning `null` instead of throwing if the
+// extension context has been invalidated (or is invalidated mid-call).
+export function connectPort(name: string): chrome.runtime.Port | null {
+  if (!isExtensionContextValid()) return null;
+  try {
+    return chrome.runtime.connect({ name });
+  } catch {
+    return null;
+  }
+}
+
+// Disconnects a port without throwing if the extension context has since
+// been invalidated.
+export function disconnectPort(port: chrome.runtime.Port): void {
+  try {
+    port.disconnect();
+  } catch {
+    // Context invalidated since connect — nothing to clean up.
+  }
+}

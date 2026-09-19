@@ -10,18 +10,18 @@ Four groups, separated by blank lines. Auto-sorted within each group:
 
 ```typescript
 // 1. Node/Chrome built-ins (rare in extension code)
-import type { Runtime } from 'chrome';
+import path from 'node:path';
 
 // 2. External packages
-import { crx } from '@anthropic-ai/crxjs-vite-plugin';
+import { crx } from '@crxjs/vite-plugin';
 
 // 3. Path alias imports (@/)
-import { MESSAGE_TYPES } from '@/shared/messages';
-import type { MockRule, ExtensionState } from '@/shared/types';
-import { STORAGE_KEYS } from '@/shared/constants';
+import { MESSAGE_TYPES } from '@/shared/constants';
+import type { AppState, Rule } from '@/shared/types';
+import { sendMessage } from '@/shared/messages';
 
 // 4. Relative imports (only within same feature directory)
-import { renderRuleList } from './components/rule-list';
+import { RuleEditor } from './components/RuleEditor';
 ```
 
 **Rules**:
@@ -57,51 +57,54 @@ import { renderRuleList } from './components/rule-list';
 
 ```typescript
 // ✅ Correct — explicit return types on exports
-export async function getRules(): Promise<MockRule[]> {
-  const result = await chrome.storage.local.get(STORAGE_KEYS.RULES);
-  return result[STORAGE_KEYS.RULES] ?? [];
+export async function getState(): Promise<AppState> {
+  const result = await chrome.storage.local.get(STORAGE_KEYS.APP_STATE);
+  const raw = result[STORAGE_KEYS.APP_STATE];
+  if (!isAppState(raw)) {
+    const initial = defaultState();
+    await setState(initial);
+    return initial;
+  }
+  return migrate(raw);
 }
 
-// ✅ Correct — discriminated union for messages
-export interface AddRuleMessage {
-  type: 'ADD_RULE';
-  payload: { rule: MockRuleInput };
-}
+// ✅ Correct — discriminated union for messages (`type` field, SCREAMING_SNAKE_CASE)
+export type RuntimeMessage =
+  | { type: typeof MESSAGE_TYPES.GET_STATE }
+  | { type: typeof MESSAGE_TYPES.MUTATE_STATE; mutation: StateMutation };
 
-// ✅ Correct — result type for fallible operations
-export interface Result<T> {
-  success: boolean;
-  data?: T;
-  error?: string;
-}
+// ✅ Correct — result type for fallible operations (this project's actual shape)
+export type Result<T> = { ok: true; value: T } | { ok: false; error: string };
 
 // ❌ Wrong — any type
 function handleMessage(message: any): any { ... }
 
 // ❌ Wrong — no return type on export
-export async function getRules() { ... }
+export async function getState() { ... }
 
 // ❌ Wrong — non-discriminated union
-type Message = { rule?: MockRule; ruleId?: number; status?: string };
+type Message = { rule?: Rule; ruleId?: string; status?: string };
 ```
 
 ---
 
 ## Naming Conventions
 
-| Category         | Style                  | Examples                                                |
-| ---------------- | ---------------------- | ------------------------------------------------------- |
-| Files (modules)  | `kebab-case.ts`        | `mock-rule.ts`, `rule-manager.ts`, `storage-helper.ts`  |
-| Files (components)| `PascalCase.tsx`      | `RuleList.tsx`, `MockEditor.tsx`                        |
-| Interfaces       | `PascalCase`           | `MockRule`, `MessagePayload`, `ExtensionState`          |
-| Type aliases     | `PascalCase`           | `RuleAction`, `MessageType`, `StorageKey`               |
-| Enums            | `PascalCase`           | `RuleType`, `ActionKind`                                |
-| Enum values      | `SCREAMING_SNAKE`      | `RuleType.REDIRECT`, `RuleType.BLOCK`                   |
-| Functions        | `camelCase`            | `addRule`, `handleMessage`, `syncRules`                  |
-| Private funcs    | `camelCase` (no prefix)| Internal to module — not exported = private             |
-| Constants        | `SCREAMING_SNAKE_CASE` | `MAX_RULES`, `STORAGE_KEYS`, `MESSAGE_TYPES`            |
-| Variables        | `camelCase`            | `ruleCount`, `isEnabled`, `currentTab`                  |
-| Boolean vars     | `is/has/should` prefix | `isActive`, `hasPermission`, `shouldInject`             |
+| Category                   | Style                                                                                                                                                                           | Examples                                                                          |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| Files (modules)            | `kebab-case.ts`                                                                                                                                                                 | `rules-dnr.ts`, `import-export.ts`, `group-notify.ts`                             |
+| Files (components)         | `PascalCase.tsx`                                                                                                                                                                | `RuleEditor.tsx`, `RulesTable.tsx`                                                |
+| Interfaces                 | `PascalCase`                                                                                                                                                                    | `Rule`, `Group`, `AppState`, `MockAction`                                         |
+| Type aliases               | `PascalCase`                                                                                                                                                                    | `RuleAction`, `StateMutation`, `UrlMatchType`                                     |
+| `as const` value objects   | `SCREAMING_SNAKE_CASE`                                                                                                                                                          | `MESSAGE_TYPES`, `STORAGE_KEYS`, `PORT_NAMES` (project uses these, not TS `enum`) |
+| Discriminant string values | `SCREAMING_SNAKE_CASE` for message `type` (`GET_STATE`); lowerCamelCase for mutation `kind` (`upsertRule`); lowercase for action/match `kind` (`'mock'`, `'header'`, `'exact'`) | see `shared/constants.ts`, `shared/messages.ts`, `shared/types.ts`                |
+| Functions                  | `camelCase`                                                                                                                                                                     | `getState`, `syncDnrRules`, `translateToDnrRules`                                 |
+| Private funcs              | `camelCase` (no prefix)                                                                                                                                                         | Internal to module — not exported = private                                       |
+| Constants                  | `SCREAMING_SNAKE_CASE`                                                                                                                                                          | `MAX_RULES`, `STORAGE_KEYS`, `MESSAGE_TYPES`                                      |
+| Variables                  | `camelCase`                                                                                                                                                                     | `ruleCount`, `masterEnabled`, `currentTab`                                        |
+| Boolean vars               | `is/has/should` prefix                                                                                                                                                          | `isActive`, `isRuleActive`, `shouldInject`                                        |
+
+Note: this project has no TypeScript `enum` anywhere in `src/` — discriminants are string-literal unions backed by `as const` objects (see `HTTP_METHODS`, `MESSAGE_TYPES`), not `enum RuleType { ... }`.
 
 ---
 
@@ -109,13 +112,13 @@ type Message = { rule?: MockRule; ruleId?: number; status?: string };
 
 ```typescript
 // ✅ Correct — named exports
-export function addRule(rule: MockRuleInput): Promise<Result<MockRule>> { ... }
-export type { MockRule, MockRuleInput };
+export function getState(): Promise<AppState> { ... }
+export type { Rule, Group, AppState };
 export { STORAGE_KEYS, MESSAGE_TYPES };
 
 // ❌ Wrong — default exports
-export default function addRule() { ... }
-export default class RuleManager { ... }
+export default function getState() { ... }
+export default class StateManager { ... }
 ```
 
 ---
@@ -123,33 +126,28 @@ export default class RuleManager { ... }
 ## Error Handling
 
 ```typescript
-// ✅ Correct — Result type, specific errors
-export async function addRule(
-  input: MockRuleInput,
-): Promise<Result<MockRule>> {
-  try {
-    const rules = await getRules();
-
-    if (rules.length >= MAX_RULES) {
-      return { success: false, error: `Maximum ${MAX_RULES} rules reached` };
-    }
-
-    const newRule = createRule(input);
-    await setRules([...rules, newRule]);
-    return { success: true, data: newRule };
-  } catch (error) {
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'Unknown error',
-    };
+// ✅ Correct — Result type, specific errors (real pattern from
+// src/shared/import-export.ts)
+export function validateRule(value: unknown, index: number, groupIds: Set<string>): Result<Rule> {
+  if (typeof value !== 'object' || value === null) {
+    return { ok: false, error: `rules[${index}]: expected an object` };
   }
+  // ...field-by-field validation...
+  return { ok: true, value: rule };
 }
 
-// ❌ Wrong — throwing for expected failures
-export async function addRule(input: MockRuleInput): Promise<MockRule> {
-  const rules = await getRules();
-  if (rules.length >= MAX_RULES) {
-    throw new Error('Too many rules'); // DON'T THROW
+// Callers narrow on `.ok`:
+const result = validateRule(raw, 0, groupIds);
+if (!result.ok) {
+  console.warn(result.error);
+} else {
+  useRule(result.value);
+}
+
+// ❌ Wrong — throwing for expected/validatable failures
+export function validateRule(value: unknown): Rule {
+  if (typeof value !== 'object') {
+    throw new Error('Invalid rule'); // DON'T THROW for expected validation failures
   }
   ...
 }
@@ -167,7 +165,7 @@ Each module follows this structure:
  */
 
 // Type imports
-import type { MockRule, Result } from '@/shared/types';
+import type { Rule, Result } from '@/shared/types';
 
 // Value imports
 import { STORAGE_KEYS } from '@/shared/constants';
@@ -176,23 +174,15 @@ import { sendMessage } from '@/shared/messages';
 // Constants
 const MAX_RETRY_COUNT = 3;
 
-// Types (local to this module)
-interface RuleManagerState {
-  rules: MockRule[];
-  syncing: boolean;
-}
-
 // Exported functions (public API)
-export async function addRule(input: MockRuleInput): Promise<Result<MockRule>> {
+export function buildExportBundle(state: AppState): ExportBundle {
   ...
 }
 
-export async function removeRule(ruleId: number): Promise<Result<void>> {
-  ...
-}
-
-// Internal helpers (not exported)
-function validateRule(input: MockRuleInput): string | null {
+// Internal helpers (not exported) — e.g. `validateRule()` in
+// src/shared/import-export.ts is a real example: called only by the
+// exported `validateBundle()`, never exported itself
+function validateRule(value: unknown, index: number, groupIds: Set<string>): Result<Rule> {
   ...
 }
 ```
@@ -201,14 +191,15 @@ function validateRule(input: MockRuleInput): string | null {
 
 ## Formatting (Prettier)
 
+This mirrors the project's actual `.prettierrc` (root of the repo):
+
 ```json
 {
   "semi": true,
   "singleQuote": true,
-  "trailingComma": "all",
+  "trailingComma": "es5",
+  "printWidth": 100,
   "tabWidth": 2,
-  "printWidth": 80,
-  "bracketSpacing": true,
   "arrowParens": "always"
 }
 ```

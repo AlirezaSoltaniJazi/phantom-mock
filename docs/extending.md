@@ -16,7 +16,7 @@ Currently two action types exist: `mock` (response mocking) and `header` (header
 
 ## Add a new URL match type
 
-Currently three match types exist: `exact`, `contains`, `regex`. To add a fourth (e.g., `glob`, `starts-with`):
+Currently four match types exist: `exact`, `contains`, `regex`, `template` (the `{random}`/`{random:N}` token syntax in `src/shared/template.ts`). To add another (e.g., `glob`, `starts-with`):
 
 1. Add the new value to `UrlMatchType` in `src/shared/types.ts`
 2. Add a case to `urlMatches()` in `src/shared/matcher.ts` — follow the existing switch pattern
@@ -34,7 +34,7 @@ The DevTools panel uses a simple tab-based layout in `src/devtools/panel.tsx`. T
    - Add the tab name to the tab list
    - Add a conditional render block (`activeTab === 'your-tab' && <YourTab ... />`)
 3. If the tab needs background state: use the existing `useAppState()` hook from `src/devtools/state-hook.ts`
-4. If the tab needs new message types: add them in `src/shared/constants.ts` (`MESSAGE_TYPES`) and `src/shared/messages.ts` (`RuntimeMessage` union), then handle them in `src/background/index.ts`
+4. If the tab needs new message types: add them in `src/shared/constants.ts` (`MESSAGE_TYPES`) and `src/shared/messages.ts` (`RuntimeMessage` union), then handle them in `src/background/service-worker.ts`
 
 ## Add a new message type
 
@@ -43,7 +43,7 @@ Messages flow between contexts via `chrome.runtime.sendMessage`. To add a new me
 1. Add the type constant in `src/shared/constants.ts` under `MESSAGE_TYPES`
 2. Add the message shape to the `RuntimeMessage` union in `src/shared/messages.ts`
 3. Update the `isRuntimeMessage()` validator in `src/shared/messages.ts` if it checks specific types
-4. Handle the message in `src/background/index.ts` — add a case in the `chrome.runtime.onMessage` listener (remember to `return true` for async responses)
+4. Handle the message in `src/background/service-worker.ts` — add a case in the `chrome.runtime.onMessage` listener (remember to `return true` for async responses)
 5. If content scripts need to handle it: add a case in `src/content/index.ts`
 
 ## Add a new storage key

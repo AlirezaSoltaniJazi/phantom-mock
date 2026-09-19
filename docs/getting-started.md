@@ -2,7 +2,7 @@
 
 ## Prerequisites
 
-- Node.js 18+ (CI tests on Node 18 and 20)
+- Node.js 20+ (CI tests on Node 20 and 22)
 - npm (ships with Node)
 - Chrome or Chromium-based browser (for loading the extension)
 
@@ -94,7 +94,7 @@ phantom-mock/
 │   ├── content/           # Content script — message bridge, toast
 │   ├── injected/          # Page-world script — fetch/XHR patching
 │   ├── devtools/          # DevTools panel UI (React)
-│   │   ├── components/    # Rule editor, rules table, hit log, settings, JSON views
+│   │   ├── components/    # Rule/group editors, storage/cookie profiles, hit log, DNR debug, settings
 │   │   └── capture/       # Network capture tab + promote-to-rule
 │   ├── popup/             # Browser-action popup
 │   ├── shared/            # Types, messages, matcher, constants, prefs, import/export

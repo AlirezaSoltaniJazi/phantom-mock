@@ -3,12 +3,12 @@
  * Copy and adapt for new content script features.
  */
 
-// Type imports
-import type { ExtensionMessage, MessageResponse } from '@/shared/types';
-
-// Value imports
-import { MESSAGE_TYPES } from '@/shared/messages';
-import { sendMessage } from '@/shared/messages';
+// Value imports — `MESSAGE_TYPES` lives in shared/constants.ts, not
+// shared/messages.ts; `isRuntimeMessage`/`sendMessage` live in shared/messages.ts
+import { MESSAGE_TYPES } from '@/shared/constants';
+import { isRuntimeMessage } from '@/shared/messages';
+// import { sendMessage } from '@/shared/messages'; // uncomment when this
+// script needs to actively query the service worker (e.g. GET_STATE)
 
 // Constants
 const HOST_ELEMENT_TAG = 'phantom-mock-root';
@@ -37,23 +37,25 @@ function init(): void {
 
 // --- Message Handling ---
 
-function handleMessage(
-  message: ExtensionMessage,
-  _sender: chrome.runtime.MessageSender,
-  sendResponse: (response: MessageResponse) => void,
-): boolean {
+function handleMessage(message: unknown): undefined {
+  // Real content scripts validate with isRuntimeMessage() before narrowing on
+  // `.type` — there's no per-message sendResponse envelope like
+  // `{ success, data, error }` in this project's message protocol; most
+  // content-script-bound messages (e.g. RULES_UPDATED) are fire-and-forget
+  // and don't call sendResponse at all.
+  if (!isRuntimeMessage(message)) return undefined;
+
   switch (message.type) {
     case MESSAGE_TYPES.RULES_UPDATED:
-      handleRulesUpdated(message.payload);
-      sendResponse({ success: true });
-      return false; // Synchronous response
+      handleRulesUpdated(message.state);
+      return undefined;
 
     default:
-      return false;
+      return undefined;
   }
 }
 
-function handleRulesUpdated(payload: unknown): void {
+function handleRulesUpdated(state: unknown): void {
   // Update UI based on new rules
   updateIndicator();
 }

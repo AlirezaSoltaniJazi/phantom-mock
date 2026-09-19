@@ -1,6 +1,6 @@
 # Phantom Mock
 
-> Chrome extension (Manifest V3) that mocks REST API responses and overrides HTTP headers directly in the browser. Built with TypeScript 5.6, React 18, Vite + CRXJS. It patches `fetch` and `XMLHttpRequest` in the page world, manages header rules via `chrome.declarativeNetRequest`, and provides a full DevTools panel for rule editing, hit logging, and network capture. MIT-licensed, Chrome Web Store ready.
+> Chrome extension (Manifest V3) that mocks REST API responses and overrides HTTP headers directly in the browser. Built with TypeScript 6.0, React 19, Vite + CRXJS. It patches `fetch` and `XMLHttpRequest` in the page world, manages header rules via `chrome.declarativeNetRequest`, and provides a full DevTools panel for rule editing, group management, storage/cookie profile switching, hit logging, DNR debugging, and network capture. MIT-licensed, Chrome Web Store ready.
 
 ## Quick start
 
@@ -23,15 +23,19 @@
 
 ### Background (Service Worker)
 
-- [`src/background/index.ts`](docs/modules.md#backgroundindexts) — message handler, state mutations, rule broadcasting
+- [`src/background/service-worker.ts`](docs/modules.md#backgroundservice-workerts) — message handler, state mutations, rule broadcasting
 - [`src/background/storage.ts`](docs/modules.md#backgroundstoragets) — chrome.storage.local wrapper, state persistence
 - [`src/background/rules-dnr.ts`](docs/modules.md#backgroundrules-dnrts) — translates rules to declarativeNetRequest format
 - [`src/background/log.ts`](docs/modules.md#backgroundlogts) — in-memory hit log buffer with port-based pub/sub
+- [`src/background/dnr-match-log.ts`](docs/modules.md#backgrounddnr-match-logts) — in-memory buffer of real DNR rule matches for the Debug tab
+- [`src/background/cookies.ts`](docs/modules.md#backgroundcookiests) — origin-scoped chrome.cookies get/set/remove
 
 ### Content Script
 
 - [`src/content/index.ts`](docs/modules.md#contentindexts) — bridges page world and service worker, relays rules/hits
-- [`src/content/toast.ts`](docs/modules.md#contenttoastts) — shadow-DOM toast notifications on mock hits
+- [`src/content/toast.ts`](docs/modules.md#contenttoastts) — shadow-DOM toast notifications on mock hits and group activation
+- [`src/content/group-notify.ts`](docs/modules.md#contentgroup-notifyts) — maps a hit's rule to its group for toast labeling
+- [`src/content/runtime.ts`](docs/modules.md#contentruntimets) — guards against "Extension context invalidated" errors
 
 ### Page Injection
 
@@ -40,14 +44,21 @@
 ### DevTools Panel
 
 - [`src/devtools/devtools.ts`](docs/modules.md#devtoolsdevtoolsts) — panel registration, HAR network capture
-- [`src/devtools/panel.tsx`](docs/modules.md#devtoolspaneltsx) — main React app with tabs (Rules, Editor, Hits, Capture, Settings)
+- [`src/devtools/panel.tsx`](docs/modules.md#devtoolspaneltsx) — main React app with tabs (Rules, Groups, Editor, Storage, Storage Editor, Cookies, Cookies Editor, Hit Log, Debug, Capture, Settings)
 - [`src/devtools/state-hook.ts`](docs/modules.md#devtoolsstate-hookts) — useAppState hook for querying/mutating background state
+- [`src/devtools/inspected-window.ts`](docs/modules.md#devtoolsinspected-windowts) — Promise wrapper for chrome.devtools.inspectedWindow (localStorage read/write, reload)
+- [`src/devtools/cookies.ts`](docs/modules.md#devtoolscookiests) — panel-side wrapper sending COOKIES_GET/SET/REMOVE to the service worker
 - [`src/devtools/components/RuleEditor.tsx`](docs/modules.md#devtoolscomponentsruleeditortsx) — form for creating/editing rules
 - [`src/devtools/components/RulesTable.tsx`](docs/modules.md#devtoolscomponentsrulestabletsx) — domain-grouped rule list
+- [`src/devtools/components/GroupsTable.tsx`](docs/modules.md#devtoolscomponentsgroupstabletsx) — group reordering, page-URL activation, popup visibility
+- [`src/devtools/components/StorageTab.tsx`](docs/modules.md#devtoolscomponentsstoragetabtsx) / [`StorageEditor.tsx`](docs/modules.md#devtoolscomponentsstorageeditortsx) — localStorage profile switching and editing
+- [`src/devtools/components/CookiesTab.tsx`](docs/modules.md#devtoolscomponentscookiestabtsx) / [`CookiesEditor.tsx`](docs/modules.md#devtoolscomponentscookieseditortsx) — cookie profile switching and editing
 - [`src/devtools/components/HitLog.tsx`](docs/modules.md#devtoolscomponentshitlogtsx) — real-time mock hit viewer
+- [`src/devtools/components/DnrDebug.tsx`](docs/modules.md#devtoolscomponentsdnrdebugtsx) — registered/translated DNR rules, sync errors, test-match form, live match tail
 - [`src/devtools/components/Settings.tsx`](docs/modules.md#devtoolscomponentssettingstsx) — import/export, preferences, master toggle
 - [`src/devtools/components/JsonBodyEditor.tsx`](docs/modules.md#devtoolscomponentsjsonbodyeditortsx) — syntax-highlighted JSON editor
 - [`src/devtools/components/JsonTreeView.tsx`](docs/modules.md#devtoolscomponentsjsontreeviewtsx) — collapsible JSON tree
+- [`src/devtools/components/BodyPreview.tsx`](docs/modules.md#devtoolscomponentsbodypreviewtsx) — captured body preview (JSON tree or raw text)
 - [`src/devtools/capture/Capture.tsx`](docs/modules.md#devtoolscapturecapturetsx) — network capture UI with domain grouping
 - [`src/devtools/capture/use-capture.ts`](docs/modules.md#devtoolscaptureuse-capturets) — hook for capture buffer and HAR import
 - [`src/devtools/capture/PromoteToRule.tsx`](docs/modules.md#devtoolscapturepromotetorulertsx) — convert captured entry to mock rule
@@ -59,18 +70,21 @@
 
 ### Shared
 
-- [`src/shared/types.ts`](docs/modules.md#sharedtypests) — Rule, Group, AppState, MockAction, HeaderAction, UIPreferences
+- [`src/shared/types.ts`](docs/modules.md#sharedtypests) — Rule, Group, StorageProfile, CookieProfile, AppState, MockAction, HeaderAction, UIPreferences
 - [`src/shared/messages.ts`](docs/modules.md#sharedmessagests) — RuntimeMessage union type, sendMessage helper
-- [`src/shared/matcher.ts`](docs/modules.md#sharedmatcherts) — URL/method matching (exact, contains, regex)
+- [`src/shared/matcher.ts`](docs/modules.md#sharedmatcherts) — URL/method matching (exact, contains, regex, template) + group activation gate
+- [`src/shared/template.ts`](docs/modules.md#sharedtemplatets) — `{random}`/`{random:N}` template token compiling and generation
+- [`src/shared/groups.ts`](docs/modules.md#sharedgroupsts) — pure array-reorder helpers for group drag-and-drop
+- [`src/shared/default-state.ts`](docs/modules.md#shareddefault-statets) — pristine AppState for first-run seeding and reset
 - [`src/shared/constants.ts`](docs/modules.md#sharedconstantsts) — storage keys, message types, port names, limits
-- [`src/shared/import-export.ts`](docs/modules.md#sharedimport-exportts) — bundle validation, import strategies (replace/merge/append)
+- [`src/shared/import-export.ts`](docs/modules.md#sharedimport-exportts) — bundle validation, import strategies (replace/merge/append), conflict resolution
 - [`src/shared/prefs.ts`](docs/modules.md#sharedprefsts) — UI preferences storage (font size, toast toggle)
 - [`src/shared/use-prefs.ts`](docs/modules.md#shareduse-prefsts) — React hook for preferences
 - [`src/shared/url-parts.ts`](docs/modules.md#sharedurl-partsts) — URL parsing, domain/subdomain extraction
 
 ### Utils
 
-- [`src/utils/id.ts`](docs/modules.md#utilsidts) — prefixed UUID generation, string-to-int hashing for DNR IDs
+- [`src/utils/id.ts`](docs/modules.md#utilsidts) — prefixed UUID generation, string-to-int hashing (used for DNR rule IDs via `ruleIdFor()` in `rules-dnr.ts`)
 
 ## Conventions
 
@@ -79,11 +93,11 @@
 - ESLint: `@typescript-eslint` — no `any`, named exports only
 - Vitest + happy-dom for tests; coverage targets 80%+ service worker, 90%+ message handlers
 - Path alias: `@/*` maps to `src/*`
-- ID prefixes: `rule_`, `grp_`, `cap_` via `newId()` in `src/utils/id.ts`
+- ID prefixes: `rule_`, `grp_`, `cap_`, `sprof_`, `cprof_` via `newId()` in `src/utils/id.ts`
 - Husky pre-commit: lint-staged runs ESLint + Prettier on staged `src/` and `tests/` files
 
 ## See also
 
 - [SKILL.md](.data/skills/chromeExtensionDeveloper/SKILL.md) — comprehensive Chrome extension development guide for this project
 - [INJECT.md](.data/skills/chromeExtensionDeveloper/INJECT.md) — quick-reference project context
-- [CHANGELOG.md](CHANGELOG.md) — version history (current: v0.1.0)
+- [CHANGELOG.md](CHANGELOG.md) — version history (current: v0.7.1)

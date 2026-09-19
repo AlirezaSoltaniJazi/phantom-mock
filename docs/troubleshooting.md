@@ -10,7 +10,7 @@
 
 ### Service worker `onMessage` handler must return `true` for async responses
 
-**Cause**: Chrome's `chrome.runtime.onMessage` listener only keeps the `sendResponse` port open if the listener synchronously returns `true`. The handler in `src/background/index.ts` returns `true` at the end — do not refactor this away.
+**Cause**: Chrome's `chrome.runtime.onMessage` listener only keeps the `sendResponse` port open if the listener synchronously returns `true`. The handler in `src/background/service-worker.ts` returns `true` at the end — do not refactor this away.
 
 **Fix**: Always `return true` from the `onMessage` callback when using `sendResponse` asynchronously.
 
@@ -24,7 +24,7 @@
 
 **Cause**: `findMatch()` in `src/injected/page-mock.ts` and `findFirstMockMatch()` in `src/shared/matcher.ts` iterate rules in array order and return the first match. There is no priority field.
 
-**Implication**: Rule order matters. More specific rules should appear before broader ones. The UI supports drag-and-drop reordering via `@dnd-kit`.
+**Implication**: Rule order matters. More specific rules should appear before broader ones. Groups support drag-and-drop reordering via native HTML5 drag events (`draggable`/`onDragStart`/`onDrop` in `GroupsTable.tsx`) and `reorderGroups()` in `src/shared/groups.ts`.
 
 ### Regex match type compiles a new RegExp on every check
 
@@ -40,7 +40,7 @@
 
 ### DNR rule IDs are hash-based, not sequential
 
-**Cause**: `hashStringToInt()` in `src/utils/id.ts` converts rule string IDs to integer IDs for DNR, offset by `DNR_RULE_ID_OFFSET`. Hash collisions are theoretically possible but unlikely at normal rule counts.
+**Cause**: `ruleIdFor()` in `src/background/rules-dnr.ts` converts rule string IDs to integer IDs for DNR, using `hashStringToInt()` from `src/utils/id.ts` modulo-clamped into the valid range. Hash collisions are theoretically possible but unlikely at normal rule counts.
 
 **Implication**: Do not assume DNR rule IDs are sequential or stable across rule ID renames.
 
@@ -61,7 +61,7 @@
 ### Rule or group schema changes
 
 - `src/shared/types.ts` — update `Rule`, `Group`, `AppState`, or action interfaces
-- `src/background/index.ts` — update `applyMutation()` if mutation shapes change
+- `src/background/service-worker.ts` — update `applyMutation()` if mutation shapes change
 - `src/shared/import-export.ts` — update `validateBundle()` to accept/reject new fields
 - `src/devtools/components/RuleEditor.tsx` — update form to expose new fields
 - `src/background/storage.ts` — update `defaultState()` if `AppState` shape changes; consider schema migration
@@ -70,7 +70,7 @@
 
 - `src/shared/constants.ts` — add to `MESSAGE_TYPES`
 - `src/shared/messages.ts` — add to `RuntimeMessage` union
-- `src/background/index.ts` — add handler case
+- `src/background/service-worker.ts` — add handler case
 
 ### New storage keys
 

@@ -28,7 +28,9 @@ function makeEvent<T extends unknown[]>(): Listener<T> {
 export function createChromeMock() {
   return {
     runtime: {
+      id: 'test-extension-id' as string | undefined,
       sendMessage: vi.fn(),
+      connect: vi.fn(),
       onMessage: makeEvent<[unknown, chrome.runtime.MessageSender, (response?: unknown) => void]>(),
       onInstalled: makeEvent<[chrome.runtime.InstalledDetails]>(),
       onStartup: makeEvent<[]>(),

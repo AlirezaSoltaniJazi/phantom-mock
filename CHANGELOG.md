@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Deleting or editing several rules in quick succession could silently bring
+  back a change that was already applied. Updates are now saved one after
+  another, so none of them overwrite each other.
+- Reloading or updating the extension with the DevTools panel open no longer
+  floods the console with "Extension context invalidated" errors.
+
+### Changed
+
+- Updated the build, test, and CI tooling to their latest versions.
+
 ## [0.7.1] - 2026-08-01
 
 ### Changed

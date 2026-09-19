@@ -1,18 +1,17 @@
 import { useEffect, useState, type JSX } from 'react';
 import { MESSAGE_TYPES, PORT_NAMES } from '@/shared/constants';
-import { sendMessage } from '@/shared/messages';
+import { connectPort, disconnectPort, sendMessage } from '@/shared/messages';
 import type { MockHit } from '@/shared/types';
 
 type PortMessage =
-  | { kind: 'snapshot'; hits: MockHit[] }
-  | { kind: 'hit'; hit: MockHit }
-  | { kind: 'cleared' };
+  { kind: 'snapshot'; hits: MockHit[] } | { kind: 'hit'; hit: MockHit } | { kind: 'cleared' };
 
 export function HitLog(): JSX.Element {
   const [hits, setHits] = useState<MockHit[]>([]);
 
   useEffect(() => {
-    const port = chrome.runtime.connect({ name: PORT_NAMES.HIT_LOG });
+    const port = connectPort(PORT_NAMES.HIT_LOG);
+    if (!port) return;
     const handler = (message: PortMessage): void => {
       if (message.kind === 'snapshot') setHits(message.hits);
       else if (message.kind === 'hit') setHits((prev) => [...prev, message.hit]);
@@ -20,7 +19,7 @@ export function HitLog(): JSX.Element {
     };
     port.onMessage.addListener(handler);
     return () => {
-      port.disconnect();
+      disconnectPort(port);
     };
   }, []);
 

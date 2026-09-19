@@ -12,11 +12,9 @@
     "alarms"
   ],
   "host_permissions": [],
-  "optional_permissions": [
-    "tabs"
-  ],
+  "optional_permissions": ["tabs"],
   "background": {
-    "service_worker": "src/background/index.ts",
+    "service_worker": "src/background/service-worker.ts",
     "type": "module"
   },
   "action": {

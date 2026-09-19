@@ -18,7 +18,7 @@ flowchart TB
     end
 
     subgraph SW["Service Worker"]
-        MsgHandler["Message Handler\nbackground/index.ts"]
+        MsgHandler["Message Handler\nbackground/service-worker.ts"]
         Storage["Storage\nbackground/storage.ts"]
         DNR["DNR Sync\nbackground/rules-dnr.ts"]
         Log["Hit Log\nbackground/log.ts"]
@@ -55,7 +55,7 @@ flowchart TB
 
 ### AppState
 
-Central state object persisted to `chrome.storage.local`. Contains `masterEnabled` flag, `groups[]`, and `rules[]`. All mutations flow through the service worker via `StateMutation` messages. Defined in `src/shared/types.ts`.
+Central state object persisted to `chrome.storage.local`. Contains `masterEnabled` flag, `groups[]`, `rules[]`, `storageProfiles[]`, and `cookieProfiles[]`. All mutations flow through the service worker via `StateMutation` messages. Defined in `src/shared/types.ts`.
 
 ### Rule + MatchSpec + RuleAction
 
@@ -63,11 +63,11 @@ The core domain model. A `Rule` has a `MatchSpec` (URL pattern + HTTP method + m
 
 ### StateMutation
 
-Seven mutation types (`upsertRule`, `deleteRule`, `toggleRule`, `upsertGroup`, `deleteGroup`, `toggleGroup`, `setMasterEnabled`, `replaceState`) processed by `applyMutation()` in `src/background/index.ts`. Every state change goes through this path.
+Fifteen mutation types (`upsertGroup`, `deleteGroup`, `toggleGroup`, `reorderGroups`, `upsertRule`, `deleteRule`, `toggleRule`, `upsertStorageProfile`, `deleteStorageProfile`, `toggleStorageProfile`, `upsertCookieProfile`, `deleteCookieProfile`, `toggleCookieProfile`, `setMasterEnabled`, `replaceState`) processed by `applyMutation()` in `src/background/service-worker.ts`. Every state change goes through this path.
 
 ### RuntimeMessage
 
-Typed message protocol for Chrome runtime messaging. Six message types: `GET_STATE`, `MUTATE_STATE`, `RULES_UPDATED`, `MOCK_HIT`, `GET_HIT_LOG`, `CLEAR_HIT_LOG`. Defined in `src/shared/messages.ts`.
+Typed message protocol for Chrome runtime messaging. Twelve message types: `GET_STATE`, `MUTATE_STATE`, `RULES_UPDATED`, `MOCK_HIT`, `GET_HIT_LOG`, `CLEAR_HIT_LOG`, `GET_DNR_DEBUG`, `TEST_DNR_MATCH`, `CLEAR_DNR_MATCH_LOG`, `COOKIES_GET`, `COOKIES_SET`, `COOKIES_REMOVE`. Defined in `src/shared/messages.ts`.
 
 ### Rule Matcher
 
@@ -83,31 +83,31 @@ Typed message protocol for Chrome runtime messaging. Six message types: `GET_STA
 
 ## Key directories
 
-| Directory                  | Purpose                                                              |
-| -------------------------- | -------------------------------------------------------------------- |
-| `src/background/`          | Service worker — state management, DNR sync, hit logging             |
-| `src/content/`             | Isolated-world content script — message bridge, toast UI             |
-| `src/injected/`            | MAIN-world page injection — fetch/XHR patching                       |
-| `src/devtools/`            | DevTools panel React app — rule editing, hit log, capture            |
-| `src/devtools/components/` | UI components — RuleEditor, RulesTable, HitLog, Settings, JSON views |
-| `src/devtools/capture/`    | Network capture tab — recording, HAR import, promote-to-rule         |
-| `src/popup/`               | Browser-action popup — master toggle, domain-grouped rule counts     |
-| `src/shared/`              | Cross-context types, messages, matcher, constants, preferences       |
-| `src/utils/`               | Pure utilities — ID generation, string hashing                       |
-| `tests/`                   | Vitest test files mirroring `src/` structure                         |
-| `public/`                  | Static assets — extension icons (16/32/48/128px)                     |
-| `store-assets/`            | Chrome Web Store listing screenshots and assets                      |
+| Directory                  | Purpose                                                                                                                     |
+| -------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `src/background/`          | Service worker — state management, DNR sync, hit logging                                                                    |
+| `src/content/`             | Isolated-world content script — message bridge, toast UI                                                                    |
+| `src/injected/`            | MAIN-world page injection — fetch/XHR patching                                                                              |
+| `src/devtools/`            | DevTools panel React app — rule editing, hit log, capture                                                                   |
+| `src/devtools/components/` | UI components — RuleEditor, RulesTable, GroupsTable, Storage/Cookies tabs & editors, HitLog, DnrDebug, Settings, JSON views |
+| `src/devtools/capture/`    | Network capture tab — recording, HAR import, promote-to-rule                                                                |
+| `src/popup/`               | Browser-action popup — master toggle, domain-grouped rule counts                                                            |
+| `src/shared/`              | Cross-context types, messages, matcher, constants, preferences                                                              |
+| `src/utils/`               | Pure utilities — ID generation, string hashing                                                                              |
+| `tests/`                   | Vitest test files mirroring `src/` structure                                                                                |
+| `public/`                  | Static assets — extension icons (16/32/48/128px)                                                                            |
+| `store-assets/`            | Chrome Web Store listing screenshots and assets                                                                             |
 
 ## External dependencies
 
 Phantom Mock is entirely client-side with no backend, database, or third-party API calls.
 
-| Dependency                     | Protocol             | Integration                                        |
-| ------------------------------ | -------------------- | -------------------------------------------------- |
-| `chrome.storage.local`         | Chrome Storage API   | `src/background/storage.ts`, `src/shared/prefs.ts` |
-| `chrome.storage.session`       | Chrome Storage API   | `src/devtools/devtools.ts` (capture buffer)        |
-| `chrome.declarativeNetRequest` | Chrome DNR API       | `src/background/rules-dnr.ts`                      |
-| `chrome.devtools.network`      | Chrome DevTools API  | `src/devtools/devtools.ts` (HAR capture)           |
-| `chrome.runtime`               | Chrome Runtime API   | Message passing across all contexts                |
-| `chrome.tabs`                  | Chrome Tabs API      | `src/background/index.ts` (broadcast to tabs)      |
-| `chrome.scripting`             | Chrome Scripting API | Permission declared for content script injection   |
+| Dependency                     | Protocol            | Integration                                                 |
+| ------------------------------ | ------------------- | ----------------------------------------------------------- |
+| `chrome.storage.local`         | Chrome Storage API  | `src/background/storage.ts`, `src/shared/prefs.ts`          |
+| `chrome.storage.session`       | Chrome Storage API  | `src/devtools/devtools.ts` (capture buffer)                 |
+| `chrome.declarativeNetRequest` | Chrome DNR API      | `src/background/rules-dnr.ts`                               |
+| `chrome.devtools.network`      | Chrome DevTools API | `src/devtools/devtools.ts` (HAR capture)                    |
+| `chrome.runtime`               | Chrome Runtime API  | Message passing across all contexts                         |
+| `chrome.tabs`                  | Chrome Tabs API     | `src/background/service-worker.ts` (broadcast to tabs)      |
+| `chrome.cookies`               | Chrome Cookies API  | `src/background/cookies.ts` (Cookies tab profile switching) |

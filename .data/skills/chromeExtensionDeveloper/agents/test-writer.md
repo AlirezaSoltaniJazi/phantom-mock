@@ -23,7 +23,7 @@ You are writing tests for the phantom-mock Chrome extension.
 Testing conventions:
 - Framework: Vitest with happy-dom environment
 - Chrome mocks: Global setup in tests/setup.ts (vi.fn() for all chrome.* APIs)
-- File naming: *.test.ts co-located or in tests/ mirror directory
+- File naming: *.test.ts in tests/, mirroring the src/ directory layout (no co-located tests in src/)
 - Reset: vi.clearAllMocks() in beforeEach
 - Style: describe/it blocks, explicit expects, test both success and error paths
 - What to mock: All chrome.* APIs, fetch, DOM (when expensive)

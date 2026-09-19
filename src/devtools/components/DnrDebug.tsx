@@ -1,6 +1,6 @@
 import { useEffect, useState, type JSX } from 'react';
 import { MAX_DNR_MATCH_ENTRIES, MESSAGE_TYPES, PORT_NAMES } from '@/shared/constants';
-import { sendMessage, type DnrTestRequest } from '@/shared/messages';
+import { connectPort, disconnectPort, sendMessage, type DnrTestRequest } from '@/shared/messages';
 import type { DnrMatchEntry } from '@/shared/types';
 
 type DnrMatchPortMessage =
@@ -73,7 +73,8 @@ export function DnrDebug(): JSX.Element {
   }, []);
 
   useEffect(() => {
-    const port = chrome.runtime.connect({ name: PORT_NAMES.DNR_MATCH_LOG });
+    const port = connectPort(PORT_NAMES.DNR_MATCH_LOG);
+    if (!port) return;
     function onMessage(msg: DnrMatchPortMessage): void {
       if (msg.kind === 'snapshot') {
         setMatches(msg.entries);
@@ -85,7 +86,7 @@ export function DnrDebug(): JSX.Element {
     }
     port.onMessage.addListener(onMessage);
     return () => {
-      port.disconnect();
+      disconnectPort(port);
     };
   }, []);
 

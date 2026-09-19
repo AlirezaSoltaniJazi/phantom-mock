@@ -16,15 +16,22 @@ For every permission in `manifest.json`:
 
 ### Per-Permission Verification
 
-| Permission                      | Verify                                                    |
-| ------------------------------- | --------------------------------------------------------- |
-| `declarativeNetRequest`         | Only used for declared mock/redirect rules                |
-| `declarativeNetRequestFeedback` | Only used for debugging UI — consider making optional     |
-| `storage`                       | Data stored is non-sensitive, validated before write       |
-| `activeTab`                     | Only accessed on user gesture (click/keyboard shortcut)    |
-| `contextMenus`                  | Menu items have clear, non-misleading labels              |
-| `alarms`                        | Alarm intervals are reasonable (>=1 minute)               |
-| `tabs`                          | NOT used if `activeTab` suffices — justify if present     |
+| Permission                      | Verify                                                                                                                                              |
+| ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `declarativeNetRequest`         | Only used for `header`-kind rules (`modifyHeaders`) — never `redirect`/`block`; mock (response-body) rules are handled client-side, not through DNR |
+| `declarativeNetRequestFeedback` | Only used for the Debug tab's live match log (`onRuleMatchedDebug`) — consider making optional                                                      |
+| `storage`                       | Data stored is non-sensitive, validated before write                                                                                                |
+| `cookies`                       | Actually used in this project — tab-scoped read/write for the Cookies tab (`background/cookies.ts`), guarded by `tabIdMatchesSender()`              |
+| `<all_urls>` (host permission)  | Present and intentional in this project (see `PRIVACY.md`) — don't flag or suggest narrowing it                                                     |
+
+`activeTab`, `contextMenus`, `alarms`, and `tabs` are **not** in this project's `manifest.json` today — the rows below are generic guidance to apply only if a future feature actually adds one of them:
+
+| Permission     | Verify                                                  |
+| -------------- | ------------------------------------------------------- |
+| `activeTab`    | Only accessed on user gesture (click/keyboard shortcut) |
+| `contextMenus` | Menu items have clear, non-misleading labels            |
+| `alarms`       | Alarm intervals are reasonable (>=1 minute)             |
+| `tabs`         | NOT used if `activeTab` suffices — justify if present   |
 
 ---
 
@@ -81,6 +88,7 @@ element.innerHTML = `<span>${userInput}</span>`; // XSS risk
 ```
 
 **MV3 enforced restrictions** (cannot be overridden):
+
 - No `eval()`, `new Function()`, or `setTimeout/setInterval` with strings
 - No inline scripts in HTML pages
 - No remotely hosted code
@@ -89,42 +97,56 @@ element.innerHTML = `<span>${userInput}</span>`; // XSS risk
 
 ## Message Security Checklist
 
-- [ ] All incoming messages validated with type guard before processing
-- [ ] Unknown message types rejected with error response
-- [ ] `sender.id` verified matches own extension ID for internal messages
-- [ ] External messages (`externally_connectable`) restricted to specific origins
+- [ ] All incoming messages validated with a type guard before processing (`isRuntimeMessage()`)
+- [ ] Unknown message types rejected (the `switch` in `service-worker.ts` falls through to `default: return false`)
+- [ ] Extension-context senders verified via `isPrivilegedSender()` before allowing state mutation (see below — this project checks `sender.url`/`sender.origin`, not `sender.id`)
+- [ ] Tab-scoped requests (cookie get/set/remove) verified via `tabIdMatchesSender()` so one tab's content script can't act on another tab's cookies
+- [ ] External messages (`externally_connectable`) restricted to specific origins — N/A today, this project doesn't declare `externally_connectable`
 - [ ] No sensitive data in message payloads sent to content scripts
-- [ ] Port names validated on connection
+- [ ] Port names validated on connection (`port.name !== PORT_NAMES.HIT_LOG` etc. — see `background/log.ts`)
 
-### Message Validation Pattern
+### Message Validation Pattern (actual project pattern)
 
 ```typescript
-function isValidMessage(message: unknown): message is ExtensionMessage {
-  return (
-    typeof message === 'object' &&
-    message !== null &&
-    'type' in message &&
-    typeof (message as { type: unknown }).type === 'string' &&
-    Object.values(MESSAGE_TYPES).includes(
-      (message as { type: string }).type as MessageType,
-    )
-  );
+// src/background/service-worker.ts
+
+// Extension contexts (popup, options, DevTools panel) report sender.url
+// starting with chrome-extension://<our-id>/. Content scripts on host pages
+// report the page's http(s):// URL. Note this does NOT check `sender.id` —
+// `sender.tab` can be populated even for a trusted DevTools-panel sender (it
+// carries the *inspected* tab), so a naive `sender.tab === undefined` or
+// `sender.id !== chrome.runtime.id` check is not what this project uses.
+export function isPrivilegedSender(sender: chrome.runtime.MessageSender): boolean {
+  const ourPrefix = chrome.runtime.getURL('');
+  const url = sender.url ?? sender.origin ?? '';
+  return url.startsWith(ourPrefix);
+}
+
+// Cross-tab cookie access guard — a compromised page's content script could
+// otherwise call chrome.runtime.sendMessage with any tabId and ask us to
+// read/write cookies on a totally unrelated tab.
+export function tabIdMatchesSender(
+  sender: chrome.runtime.MessageSender,
+  requestedTabId: number
+): boolean {
+  if (isPrivilegedSender(sender)) return true;
+  return sender.tab?.id === requestedTabId;
 }
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  // Verify sender is our extension
-  if (sender.id !== chrome.runtime.id) {
-    sendResponse({ success: false, error: 'Unauthorized sender' });
-    return false;
-  }
+  if (!isRuntimeMessage(message)) return false; // type guard first
 
-  // Validate message shape
-  if (!isValidMessage(message)) {
-    sendResponse({ success: false, error: 'Invalid message format' });
-    return false;
+  switch (message.type) {
+    case MESSAGE_TYPES.MUTATE_STATE:
+      if (!isPrivilegedSender(sender)) {
+        sendResponse({ ok: false, error: 'MUTATE_STATE is restricted to extension contexts' });
+        return false;
+      }
+      // ...process...
+      return true;
+    default:
+      return false; // unknown/unhandled types are silently not responded to
   }
-
-  // Process validated message...
 });
 ```
 

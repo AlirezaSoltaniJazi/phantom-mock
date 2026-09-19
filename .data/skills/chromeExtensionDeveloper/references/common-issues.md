@@ -13,6 +13,7 @@
 **Cause**: MV3 service workers have a 30-second idle timeout (5 minutes with active events).
 
 **Fix**:
+
 - Store all state in `chrome.storage.local` — never in memory variables
 - Use `chrome.alarms` instead of `setTimeout`/`setInterval`
 - Re-sync state in `chrome.runtime.onStartup` listener
@@ -44,6 +45,7 @@ async function init() {
 **Symptom**: Content script code doesn't run on target pages.
 
 **Causes & Fixes**:
+
 1. **Manifest `matches` pattern wrong** — test patterns at https://developer.chrome.com/docs/extensions/develop/concepts/match-patterns
 2. **`run_at` timing** — use `document_idle` (default) or `document_end` for most cases
 3. **Extension not reloaded** — after manifest changes, reload extension in `chrome://extensions`
@@ -76,6 +78,7 @@ const shadow = host.attachShadow({ mode: 'closed' });
 **Symptom**: Response from background is always `undefined`.
 
 **Causes**:
+
 1. **Async handler without `return true`** — if handler is async, listener MUST return `true`
 2. **No listener registered** — service worker terminated before message arrived
 3. **Multiple listeners** — only one can `sendResponse`
@@ -93,6 +96,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 **Symptom**: `chrome.runtime.sendMessage` throws connection error.
 
 **Causes**:
+
 1. **Extension reloaded** — content scripts from old version are orphaned
 2. **Service worker not running** — message arrives before SW wakes up
 3. **Tab closed** — attempting to send to a closed tab
@@ -116,6 +120,7 @@ try {
 **Symptom**: `chrome.storage.local.set` fails silently or throws.
 
 **Fix**:
+
 - `sync` quota: 100KB total, 8KB per item — use for preferences only
 - `local` quota: 10MB — use for rule data
 - Monitor with `chrome.storage.local.getBytesInUse()`
@@ -124,14 +129,24 @@ try {
 
 **Symptom**: Extension breaks after update due to changed data schema.
 
-**Fix**: Always version your storage schema and run migrations:
+**Fix**: Version your storage schema and migrate additively. This project does **not** gate
+migration on `chrome.runtime.onInstalled`'s `reason === 'update'` — there is no `migrateStorage()`
+function. Instead, `background/storage.ts`'s `migrate()` runs additively on **every** `getState()`
+read (so it self-heals regardless of how state got out of date), keyed on `CURRENT_SCHEMA_VERSION`
+in `shared/types.ts`:
 
 ```typescript
-chrome.runtime.onInstalled.addListener(async ({ reason, previousVersion }) => {
-  if (reason === 'update') {
-    await migrateStorage(previousVersion!);
+// src/background/storage.ts (real pattern)
+export async function getState(): Promise<AppState> {
+  const result = await chrome.storage.local.get(STORAGE_KEYS.APP_STATE);
+  const raw = result[STORAGE_KEYS.APP_STATE];
+  if (!isAppState(raw)) {
+    const initial = defaultState();
+    await setState(initial);
+    return initial;
   }
-});
+  return migrate(raw); // fills in missing/legacy fields on every read
+}
 ```
 
 ---
@@ -143,6 +158,7 @@ chrome.runtime.onInstalled.addListener(async ({ reason, previousVersion }) => {
 **Symptom**: Changes don't reflect in the extension during development.
 
 **Fixes**:
+
 1. Check Vite dev server is running
 2. Verify CRXJS plugin version matches Vite version
 3. Service worker changes often require manual reload at `chrome://extensions`
@@ -152,19 +168,18 @@ chrome.runtime.onInstalled.addListener(async ({ reason, previousVersion }) => {
 
 **Symptom**: `chrome.*` APIs show type errors or are unrecognized.
 
-**Fix**: Install Chrome types:
+**Fix**: This project already depends on `@types/chrome` (see `package.json`). If types are missing on a fresh clone, reinstall:
 
 ```bash
-npm install -D @anthropic-ai/chrome-types
-# or
-npm install -D @anthropic-ai/web-extensions
+npm install -D @types/chrome
 ```
 
-Add to `tsconfig.json`:
+`tsconfig.json` already includes it via the short name:
+
 ```json
 {
   "compilerOptions": {
-    "types": ["@anthropic-ai/chrome-types"]
+    "types": ["chrome", "vitest/globals"]
   }
 }
 ```
@@ -178,6 +193,7 @@ Add to `tsconfig.json`:
 **Symptom**: Requests pass through without being intercepted.
 
 **Debug steps**:
+
 1. Check `chrome.declarativeNetRequest.getDynamicRules()` — are rules registered?
 2. Verify `urlFilter` syntax — uses Chrome's filter syntax, not regex
 3. Check `resourceTypes` — must include the request type (e.g., `xmlhttprequest`)
@@ -186,7 +202,11 @@ Add to `tsconfig.json`:
 
 ### Dynamic Rules Limit
 
-**Limit**: 5000 dynamic rules per extension.
+**Limit**: `chrome.declarativeNetRequest.MAX_NUMBER_OF_DYNAMIC_RULES` — check the constant in the
+`@types/chrome` version this project pins (`package.json`), since Chrome has raised this limit
+over time (it is 30000 in the currently-installed `@types/chrome`, not the older 5000 figure).
+This project's own `MAX_RULES` (`shared/constants.ts`) caps total rules (mock + header) at 4000,
+well under either figure.
 
 **Fix**: Manage rule count, implement pagination or rule consolidation.
 

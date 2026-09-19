@@ -2,14 +2,6 @@
 // Wraps chrome.devtools.inspectedWindow.* (which uses the legacy callback
 // shape) in Promises so callers can `await` them.
 
-interface ExceptionInfo {
-  isError?: boolean;
-  isException?: boolean;
-  code?: string;
-  description?: string;
-  value?: string;
-}
-
 // True only when the panel is loaded inside DevTools (chrome.devtools.* is
 // injected by Chrome at that point). When the panel HTML is opened as a
 // plain extension page, chrome.devtools is undefined — every helper below
@@ -32,20 +24,17 @@ export function evalInInspected<T>(expression: string): Promise<T> {
       reject(new Error(NOT_IN_DEVTOOLS_MESSAGE));
       return;
     }
-    chrome.devtools.inspectedWindow.eval(
-      expression,
-      (result: unknown, exceptionInfo: ExceptionInfo | undefined) => {
-        if (exceptionInfo && (exceptionInfo.isError || exceptionInfo.isException)) {
-          reject(
-            new Error(
-              exceptionInfo.value || exceptionInfo.description || 'inspectedWindow.eval failed'
-            )
-          );
-          return;
-        }
-        resolve(result as T);
+    chrome.devtools.inspectedWindow.eval(expression, (result, exceptionInfo) => {
+      if (exceptionInfo && (exceptionInfo.isError || exceptionInfo.isException)) {
+        reject(
+          new Error(
+            exceptionInfo.value || exceptionInfo.description || 'inspectedWindow.eval failed'
+          )
+        );
+        return;
       }
-    );
+      resolve(result as T);
+    });
   });
 }
 
