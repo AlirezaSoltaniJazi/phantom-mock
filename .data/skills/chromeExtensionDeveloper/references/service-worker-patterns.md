@@ -12,11 +12,19 @@ The MV3 service worker can terminate at any time. Design for statelessness:
 // src/background/service-worker.ts
 
 // ✅ Correct — event listeners at top level (registered synchronously)
-chrome.runtime.onInstalled.addListener(handleInstalled);
-chrome.runtime.onStartup.addListener(handleStartup);
-chrome.runtime.onMessage.addListener(handleMessage);
-chrome.alarms.onAlarm.addListener(handleAlarm);
-chrome.declarativeNetRequest.onRuleMatchedDebug?.addListener(handleRuleMatched);
+chrome.runtime.onInstalled.addListener(async () => {
+  const current = await getState().catch(() => null);
+  if (!current) {
+    await setState(defaultState());
+  }
+  await syncDnrWithDiagnostics(await getState());
+});
+chrome.runtime.onStartup.addListener(async () => {
+  await syncDnrWithDiagnostics(await getState());
+});
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  /* ... */
+});
 
 // ❌ Wrong — conditional event registration (may miss events after wake)
 if (someCondition) {
@@ -24,174 +32,143 @@ if (someCondition) {
 }
 ```
 
+This project does **not** use `chrome.alarms` or `chrome.contextMenus` — there's no periodic background work and no context-menu integration. State recovery instead happens by re-reading `chrome.storage.local` and re-syncing `declarativeNetRequest` on `onInstalled`/`onStartup` (see below).
+
 ---
 
 ## State Persistence
 
-Never store state in service worker memory — it will be lost:
+Never store state in service worker memory — it will be lost. All persisted state lives in a single `AppState` object under one storage key:
 
 ```typescript
 // src/background/storage.ts
 
+import { CURRENT_SCHEMA_VERSION, type AppState } from '@/shared/types';
 import { STORAGE_KEYS } from '@/shared/constants';
-import type { MockRule, ExtensionState } from '@/shared/types';
+import { defaultAppState } from '@/shared/default-state';
 
-// Typed storage wrapper
-export async function getState(): Promise<ExtensionState> {
-  const result = await chrome.storage.local.get(STORAGE_KEYS.STATE);
-  return result[STORAGE_KEYS.STATE] ?? getDefaultState();
+export function defaultState(): AppState {
+  return defaultAppState();
 }
 
-export async function setState(
-  updater: (current: ExtensionState) => ExtensionState
-): Promise<void> {
+export async function getState(): Promise<AppState> {
+  const result = await chrome.storage.local.get(STORAGE_KEYS.APP_STATE);
+  const raw = result[STORAGE_KEYS.APP_STATE];
+  if (!isAppState(raw)) {
+    const initial = defaultState();
+    await setState(initial);
+    return initial;
+  }
+  return migrate(raw); // additive-only soft migration, runs on every read
+}
+
+export async function setState(state: AppState): Promise<void> {
+  await chrome.storage.local.set({ [STORAGE_KEYS.APP_STATE]: state });
+}
+
+export async function updateState(updater: (current: AppState) => AppState): Promise<AppState> {
   const current = await getState();
   const next = updater(current);
-  await chrome.storage.local.set({ [STORAGE_KEYS.STATE]: next });
+  await setState(next);
+  return next;
 }
 
-export async function getRules(): Promise<MockRule[]> {
-  const result = await chrome.storage.local.get(STORAGE_KEYS.RULES);
-  return result[STORAGE_KEYS.RULES] ?? [];
-}
-
-export async function setRules(rules: MockRule[]): Promise<void> {
-  await chrome.storage.local.set({ [STORAGE_KEYS.RULES]: rules });
-}
-
-function getDefaultState(): ExtensionState {
-  return {
-    enabled: true,
-    ruleCount: 0,
-    lastUpdated: Date.now(),
+export function subscribe(listener: (next: AppState) => void): () => void {
+  const handler = (
+    changes: { [key: string]: chrome.storage.StorageChange },
+    area: chrome.storage.AreaName
+  ): void => {
+    if (area !== 'local') return;
+    const change = changes[STORAGE_KEYS.APP_STATE];
+    if (!change) return;
+    if (isAppState(change.newValue)) listener(change.newValue);
   };
+  chrome.storage.onChanged.addListener(handler);
+  return () => chrome.storage.onChanged.removeListener(handler);
 }
 ```
 
+There's no separate "rules" storage key or `MockRule`/`ExtensionState` type — rules, groups, storage profiles, and cookie profiles are all fields inside the single `AppState` object (`STORAGE_KEYS.APP_STATE`), and mutated exclusively through `StateMutation` objects (see [message-passing-guide.md](message-passing-guide.md)).
+
 ---
 
-## Installation & Update Handlers
+## Installation & Startup Handlers
 
 ```typescript
 // src/background/service-worker.ts
 
-async function handleInstalled(details: chrome.runtime.InstalledDetails): Promise<void> {
-  switch (details.reason) {
-    case 'install':
-      await initializeExtension();
-      break;
-    case 'update':
-      await migrateStorage(details.previousVersion!);
-      break;
+chrome.runtime.onInstalled.addListener(async () => {
+  const current = await getState().catch(() => null);
+  if (!current) {
+    await setState(defaultState());
   }
-}
-
-async function initializeExtension(): Promise<void> {
-  // Set default state
-  await setState(() => getDefaultState());
-
-  // Register context menus
-  chrome.contextMenus.create({
-    id: 'mock-this-url',
-    title: 'Mock this URL with Phantom Mock',
-    contexts: ['link', 'page'],
-  });
-
-  // Set initial badge
-  await chrome.action.setBadgeBackgroundColor({ color: '#4CAF50' });
-}
-```
-
----
-
-## Persistence via Alarms
-
-Keep service worker alive for time-sensitive operations:
-
-```typescript
-// For rule expiration checks
-chrome.alarms.create('check-expired-rules', {
-  periodInMinutes: 1,
+  await syncDnrWithDiagnostics(await getState());
 });
 
-async function handleAlarm(alarm: chrome.alarms.Alarm): Promise<void> {
-  switch (alarm.name) {
-    case 'check-expired-rules':
-      await removeExpiredRules();
-      break;
-  }
-}
+chrome.runtime.onStartup.addListener(async () => {
+  await syncDnrWithDiagnostics(await getState());
+});
 
-async function removeExpiredRules(): Promise<void> {
-  const rules = await getRules();
-  const now = Date.now();
-  const activeRules = rules.filter((rule) => !rule.expiresAt || rule.expiresAt > now);
-
-  if (activeRules.length !== rules.length) {
-    await setRules(activeRules);
-    await syncDeclarativeNetRequestRules(activeRules);
-    await updateBadge(activeRules.length);
-  }
-}
+// Re-sync declarativeNetRequest and broadcast to tabs on every storage change,
+// not just at startup — this is the project's actual "reactive" persistence
+// pattern rather than versioned migrations gated on install `reason`.
+subscribe(async (next) => {
+  await syncDnrWithDiagnostics(next);
+  await broadcastRulesUpdated(next);
+});
 ```
+
+There is no `chrome.contextMenus.create()` call anywhere in this project, and no badge text/color management (`chrome.action.setBadgeBackgroundColor` etc. are not used) — the popup shows counts by reading `AppState` directly, not via the action badge.
 
 ---
 
 ## DeclarativeNetRequest Rule Sync
 
 ```typescript
-// src/background/rules.ts
+// src/background/rules-dnr.ts
 
-import type { MockRule } from '@/shared/types';
-
-export async function syncDeclarativeNetRequestRules(
-  rules: MockRule[]
-): Promise<{ success: boolean; error?: string }> {
-  try {
-    // Get current dynamic rules
-    const existingRules = await chrome.declarativeNetRequest.getDynamicRules();
-    const removeRuleIds = existingRules.map((r) => r.id);
-
-    // Convert our rules to declarativeNetRequest format
-    const addRules = rules.filter((r) => r.enabled).map(toDeclarativeNetRequestRule);
-
-    // Atomic update — remove old, add new
-    await chrome.declarativeNetRequest.updateDynamicRules({
-      removeRuleIds,
-      addRules,
-    });
-
-    return { success: true };
-  } catch (error) {
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'Rule sync failed',
-    };
-  }
+export function translateToDnrRules(state: AppState): chrome.declarativeNetRequest.Rule[] {
+  if (!state.masterEnabled) return [];
+  // ...filters state.rules to action.kind === 'header', builds one DNR
+  // modifyHeaders rule per rule via buildCondition()/toDnrHeaders()
 }
 
-function toDeclarativeNetRequestRule(rule: MockRule): chrome.declarativeNetRequest.Rule {
-  return {
-    id: rule.id,
-    priority: rule.priority ?? 1,
-    action: buildAction(rule),
-    condition: buildCondition(rule),
-  };
+export async function syncDnrRules(state: AppState): Promise<void> {
+  const desired = translateToDnrRules(state);
+  const existing = await chrome.declarativeNetRequest.getDynamicRules();
+  const removeRuleIds = existing.map((r) => r.id);
+  await chrome.declarativeNetRequest.updateDynamicRules({
+    removeRuleIds,
+    addRules: desired,
+  });
 }
 ```
+
+Note the function names: `syncDnrRules()` and `translateToDnrRules()` in `background/rules-dnr.ts` — not `rules.ts` and not `syncDeclarativeNetRequestRules()`. `syncDnrRules()` throws on failure; the caller (`syncDnrWithDiagnostics()` in `service-worker.ts`) is what catches the error, stashes it for the DevTools Debug tab, and logs it — `syncDnrRules()` itself has no `{ success, error }` return value.
+
+Mock (response-body) rules are **never** translated to DNR — DNR can't synthesize a response body. Only `header`-kind rules go through this path; `mock`-kind rules are matched client-side in `injected/page-mock.ts`.
 
 ---
 
 ## Error Recovery Pattern
 
 ```typescript
-// Recover state after service worker restart
-chrome.runtime.onStartup.addListener(async () => {
-  // Re-sync rules from storage to declarativeNetRequest
-  const rules = await getRules();
-  await syncDeclarativeNetRequestRules(rules);
-  await updateBadge(rules.filter((r) => r.enabled).length);
-});
+// Stash the last declarativeNetRequest failure so the DevTools Debug tab can
+// surface it, and re-sync from storage on every subsequent change.
+async function syncDnrWithDiagnostics(state: AppState): Promise<void> {
+  try {
+    await syncDnrRules(state);
+    lastDnrSyncError = null;
+  } catch (err) {
+    const translated = translateToDnrRules(state);
+    lastDnrSyncError = {
+      message: (err as Error).message,
+      translatedJson: JSON.stringify(translated, null, 2),
+      ts: Date.now(),
+    };
+    console.error('[phantom-mock] declarativeNetRequest.updateDynamicRules failed', err);
+  }
+}
 ```
 
 ---
@@ -199,8 +176,8 @@ chrome.runtime.onStartup.addListener(async () => {
 ## Rules
 
 1. **Register all event listeners synchronously** at top level — never conditionally
-2. **Never store state in variables** — always use `chrome.storage`
+2. **Never store state in variables** — always use `chrome.storage.local` via `getState()`/`setState()`/`updateState()`
 3. **Design for termination** — SW can die between any two lines of code
-4. **Recover on startup** — re-sync state from storage on `onStartup` and `onInstalled`
-5. **Use alarms for periodic work** — never `setInterval` or `setTimeout` for long delays
+4. **Recover on startup** — re-sync DNR rules from storage on `onStartup` and `onInstalled`, and again on every `subscribe()` callback (storage change)
+5. **This project doesn't use alarms or context menus** — don't add `chrome.alarms`/`chrome.contextMenus` code unless a new feature genuinely needs it (and the corresponding permission is added to `manifest.json` first)
 6. **Batch storage operations** — minimize reads/writes to reduce wake-ups

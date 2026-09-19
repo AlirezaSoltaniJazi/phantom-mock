@@ -6,146 +6,156 @@
 
 ## Message Type System
 
-All messages use a discriminated union pattern with a `type` field:
+All messages use a discriminated union pattern with a `type` field. The discriminant values live in `shared/constants.ts`; the message shapes live in `shared/messages.ts`:
+
+```typescript
+// src/shared/constants.ts
+
+export const MESSAGE_TYPES = {
+  GET_STATE: 'GET_STATE',
+  MUTATE_STATE: 'MUTATE_STATE',
+  RULES_UPDATED: 'RULES_UPDATED',
+  MOCK_HIT: 'MOCK_HIT',
+  GET_HIT_LOG: 'GET_HIT_LOG',
+  CLEAR_HIT_LOG: 'CLEAR_HIT_LOG',
+  GET_DNR_DEBUG: 'GET_DNR_DEBUG',
+  TEST_DNR_MATCH: 'TEST_DNR_MATCH',
+  CLEAR_DNR_MATCH_LOG: 'CLEAR_DNR_MATCH_LOG',
+  COOKIES_GET: 'COOKIES_GET',
+  COOKIES_SET: 'COOKIES_SET',
+  COOKIES_REMOVE: 'COOKIES_REMOVE',
+} as const;
+```
 
 ```typescript
 // src/shared/messages.ts
 
-export const MESSAGE_TYPES = {
-  ADD_RULE: 'ADD_RULE',
-  REMOVE_RULE: 'REMOVE_RULE',
-  UPDATE_RULE: 'UPDATE_RULE',
-  TOGGLE_RULE: 'TOGGLE_RULE',
-  GET_RULES: 'GET_RULES',
-  RULES_UPDATED: 'RULES_UPDATED',
-  GET_STATUS: 'GET_STATUS',
-  STATUS_RESPONSE: 'STATUS_RESPONSE',
-} as const;
+import { MESSAGE_TYPES } from './constants';
+import type { AppState, MockHit } from './types';
 
-export type MessageType = (typeof MESSAGE_TYPES)[keyof typeof MESSAGE_TYPES];
+// State mutations are NOT separate message types — they're a single
+// `MUTATE_STATE` message carrying a `StateMutation` payload, discriminated by
+// a lowerCamelCase `kind` field (not SCREAMING_SNAKE_CASE like message types).
+export type StateMutation =
+  | { kind: 'upsertGroup'; group: import('./types').Group }
+  | { kind: 'deleteGroup'; groupId: string }
+  | { kind: 'toggleGroup'; groupId: string; enabled: boolean }
+  | { kind: 'reorderGroups'; orderedIds: string[] }
+  | { kind: 'upsertRule'; rule: import('./types').Rule }
+  | { kind: 'deleteRule'; ruleId: string }
+  | { kind: 'toggleRule'; ruleId: string; enabled: boolean }
+  | { kind: 'upsertStorageProfile'; profile: import('./types').StorageProfile }
+  | { kind: 'deleteStorageProfile'; profileId: string }
+  | { kind: 'toggleStorageProfile'; profileId: string; enabled: boolean }
+  | { kind: 'upsertCookieProfile'; profile: import('./types').CookieProfile }
+  | { kind: 'deleteCookieProfile'; profileId: string }
+  | { kind: 'toggleCookieProfile'; profileId: string; enabled: boolean }
+  | { kind: 'setMasterEnabled'; enabled: boolean }
+  | { kind: 'replaceState'; state: AppState };
 
-// Request messages (popup/content -> background)
-export interface AddRuleMessage {
-  type: typeof MESSAGE_TYPES.ADD_RULE;
-  payload: {
-    rule: MockRuleInput;
-  };
+export type RuntimeMessage =
+  | { type: typeof MESSAGE_TYPES.GET_STATE }
+  | { type: typeof MESSAGE_TYPES.MUTATE_STATE; mutation: StateMutation }
+  | { type: typeof MESSAGE_TYPES.RULES_UPDATED; state: AppState }
+  | { type: typeof MESSAGE_TYPES.MOCK_HIT; hit: MockHit }
+  | { type: typeof MESSAGE_TYPES.GET_HIT_LOG }
+  | { type: typeof MESSAGE_TYPES.CLEAR_HIT_LOG }
+  | { type: typeof MESSAGE_TYPES.GET_DNR_DEBUG };
+
+// ...COOKIES_GET/SET/REMOVE and TEST_DNR_MATCH/CLEAR_DNR_MATCH_LOG omitted
+// here for brevity — see the real file for the full union.
+// Type guard — validates an unknown value is one of our known message types
+export function isRuntimeMessage(value: unknown): value is RuntimeMessage {
+  if (typeof value !== 'object' || value === null) return false;
+  const type = (value as { type?: unknown }).type;
+  return (
+    typeof type === 'string' &&
+    Object.values(MESSAGE_TYPES).includes(type as RuntimeMessage['type'])
+  );
 }
 
-export interface RemoveRuleMessage {
-  type: typeof MESSAGE_TYPES.REMOVE_RULE;
-  payload: {
-    ruleId: number;
-  };
+// Sender helper — no envelope wrapping. Resolves with whatever the receiver's
+// sendResponse() passed, or REJECTS on chrome.runtime.lastError. There is no
+// `{ success, data, error }` response envelope type — callers `await` this and
+// either get the raw response or a thrown/rejected Error.
+export async function sendMessage<T>(message: RuntimeMessage): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    chrome.runtime.sendMessage(message, (response) => {
+      const err = chrome.runtime.lastError;
+      if (err) {
+        reject(new Error(err.message));
+        return;
+      }
+      resolve(response as T);
+    });
+  });
 }
-
-export interface GetRulesMessage {
-  type: typeof MESSAGE_TYPES.GET_RULES;
-}
-
-// Response type
-export interface MessageResponse<T = unknown> {
-  success: boolean;
-  data?: T;
-  error?: string;
-}
-
-// Union of all messages
-export type ExtensionMessage =
-  | AddRuleMessage
-  | RemoveRuleMessage
-  | UpdateRuleMessage
-  | ToggleRuleMessage
-  | GetRulesMessage
-  | GetStatusMessage;
 ```
 
 ---
 
-## Sending Messages (Popup -> Background)
+## Sending Messages (Panel/Popup -> Background)
 
 ```typescript
-// src/shared/messages.ts — helper function
+// Usage in devtools/state-hook.ts or popup/main.tsx
+import { sendMessage } from '@/shared/messages';
+import { MESSAGE_TYPES } from '@/shared/constants';
 
-export async function sendMessage<T>(message: ExtensionMessage): Promise<MessageResponse<T>> {
-  try {
-    const response = await chrome.runtime.sendMessage(message);
-    if (chrome.runtime.lastError) {
-      return { success: false, error: chrome.runtime.lastError.message };
-    }
-    return response as MessageResponse<T>;
-  } catch (error) {
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'Unknown error',
-    };
-  }
-}
-
-// Usage in popup
-import { sendMessage, MESSAGE_TYPES } from '@/shared/messages';
-
-const response = await sendMessage<MockRule[]>({
-  type: MESSAGE_TYPES.GET_RULES,
+const response = await sendMessage<{ ok: true; state: AppState } | { ok: false; error: string }>({
+  type: MESSAGE_TYPES.GET_STATE,
 });
 
-if (response.success) {
-  renderRules(response.data!);
+if (response.ok) {
+  applyState(response.state);
 } else {
-  showError(response.error!);
+  console.warn(response.error);
 }
 ```
+
+The receiver decides the shape of a successful payload per message type (e.g. `{ ok: true, state }` for `GET_STATE`, `{ ok: true, hits }` for `GET_HIT_LOG`) — the only project-wide convention is the `ok: true | false` discriminant, not a fixed `{ success, data, error }` envelope.
 
 ---
 
 ## Receiving Messages (Background Service Worker)
 
 ```typescript
-// src/background/service-worker.ts
+// src/background/service-worker.ts (abbreviated — see the real file for the
+// full switch over all twelve MESSAGE_TYPES)
 
-import { type ExtensionMessage, MESSAGE_TYPES } from '@/shared/messages';
+import { isRuntimeMessage } from '@/shared/messages';
+import { MESSAGE_TYPES } from '@/shared/constants';
 
-chrome.runtime.onMessage.addListener(
-  (
-    message: ExtensionMessage,
-    sender: chrome.runtime.MessageSender,
-    sendResponse: (response: MessageResponse) => void
-  ) => {
-    // Type guard — reject unknown messages
-    if (!message || !message.type || !(message.type in MESSAGE_TYPES)) {
-      sendResponse({ success: false, error: 'Unknown message type' });
-      return false;
-    }
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (!isRuntimeMessage(message)) return false;
 
-    // Async handler — return true to keep sendResponse alive
-    handleMessage(message, sender)
-      .then(sendResponse)
-      .catch((error) => {
-        sendResponse({
-          success: false,
-          error: error instanceof Error ? error.message : 'Handler failed',
-        });
-      });
-
-    return true; // Keep message channel open for async response
-  }
-);
-
-async function handleMessage(
-  message: ExtensionMessage,
-  sender: chrome.runtime.MessageSender
-): Promise<MessageResponse> {
   switch (message.type) {
-    case MESSAGE_TYPES.ADD_RULE:
-      return handleAddRule(message.payload.rule);
-    case MESSAGE_TYPES.REMOVE_RULE:
-      return handleRemoveRule(message.payload.ruleId);
-    case MESSAGE_TYPES.GET_RULES:
-      return handleGetRules();
+    case MESSAGE_TYPES.GET_STATE:
+      getState()
+        .then((state) => sendResponse({ ok: true, state }))
+        .catch((err: Error) => sendResponse({ ok: false, error: err.message }));
+      return true; // async — keep the channel open
+
+    case MESSAGE_TYPES.MUTATE_STATE:
+      // Only extension contexts (panel/popup) may mutate persisted state —
+      // a content script sender is rejected here.
+      if (!isPrivilegedSender(sender)) {
+        sendResponse({ ok: false, error: 'MUTATE_STATE is restricted to extension contexts' });
+        return false;
+      }
+      updateState((current) => applyMutation(current, message.mutation))
+        .then((state) => sendResponse({ ok: true, state }))
+        .catch((err: Error) => sendResponse({ ok: false, error: err.message }));
+      return true;
+
+    case MESSAGE_TYPES.MOCK_HIT:
+      recordHit(message.hit);
+      sendResponse({ ok: true });
+      return false; // synchronous — no need to keep the channel open
+
     default:
-      return { success: false, error: `Unhandled message: ${message.type}` };
+      return false;
   }
-}
+});
 ```
 
 ---
@@ -153,63 +163,56 @@ async function handleMessage(
 ## Content Script <-> Background Communication
 
 ```typescript
-// src/content/index.ts — sending to background
-
-async function notifyBackground(url: string): Promise<void> {
-  const response = await sendMessage({
-    type: MESSAGE_TYPES.GET_STATUS,
-  });
-
-  if (response.success && response.data?.active) {
-    injectMockIndicator();
+// src/content/index.ts (actual pattern) — pulling state on load
+async function pullStateAndSeed(): Promise<void> {
+  if (!isExtensionContextValid()) return;
+  try {
+    const response = await chrome.runtime.sendMessage({ type: MESSAGE_TYPES.GET_STATE });
+    if (response && typeof response === 'object' && 'state' in response) {
+      postRulesToPage((response as { state: AppState }).state);
+    }
+  } catch (err) {
+    console.warn('[phantom-mock] failed to pull state', err);
   }
 }
 
-// Background -> Content script (targeted)
-async function notifyContentScript(tabId: number): Promise<void> {
-  try {
-    await chrome.tabs.sendMessage(tabId, {
-      type: MESSAGE_TYPES.RULES_UPDATED,
-      payload: { rules: await getRules() },
-    });
-  } catch {
-    // Tab might not have content script — ignore
-  }
+// Background -> Content script (targeted, best-effort — content script may
+// not be present on chrome://, the Web Store, or a still-loading tab)
+async function broadcastRulesUpdated(state: AppState): Promise<void> {
+  const message: RuntimeMessage = { type: MESSAGE_TYPES.RULES_UPDATED, state };
+  const tabs = await chrome.tabs.query({ url: ['http://*/*', 'https://*/*', 'file:///*'] });
+  const targets = tabs.filter(canReceiveContentScriptMessage);
+  await Promise.all(
+    targets.map((tab) => chrome.tabs.sendMessage(tab.id, message).catch(() => undefined))
+  );
 }
 ```
+
+Content scripts receiving `RULES_UPDATED` don't call `sendResponse` at all — the listener in `content/index.ts` returns `undefined` synchronously; it's fire-and-forget in that direction.
 
 ---
 
 ## Long-Lived Connections (Ports)
 
-Use ports when real-time updates are needed (e.g., rule editing live preview):
+Phantom Mock uses ports for the two live-tailing views in the DevTools panel — the Hit Log and the DNR Debug match log — not for general request/response traffic:
 
 ```typescript
-// Popup opens connection
-const port = chrome.runtime.connect({ name: 'popup-live' });
-
-port.onMessage.addListener((message: MessageResponse) => {
-  updateUI(message.data);
-});
-
-port.onDisconnect.addListener(() => {
-  // Cleanup — port closed (popup closed or SW terminated)
-  console.log('Port disconnected');
-});
-
-// Background handles port
+// src/background/log.ts / dnr-match-log.ts — background side
 chrome.runtime.onConnect.addListener((port) => {
-  if (port.name === 'popup-live') {
-    port.onMessage.addListener((message) => {
-      // Handle port messages
-    });
+  if (port.name !== PORT_NAMES.HIT_LOG) return; // or PORT_NAMES.DNR_MATCH_LOG
+  subscribers.add(port);
+  port.postMessage({ kind: 'snapshot', hits: getHits() });
+  port.onDisconnect.addListener(() => subscribers.delete(port));
+});
 
-    port.onDisconnect.addListener(() => {
-      // Cleanup port-specific state
-    });
-  }
+// devtools/components/HitLog.tsx — panel side
+const port = chrome.runtime.connect({ name: PORT_NAMES.HIT_LOG });
+port.onMessage.addListener((message) => {
+  // message is { kind: 'snapshot', hits } | { kind: 'hit', hit } | { kind: 'cleared' }
 });
 ```
+
+`PORT_NAMES` (`'phantom-mock.hit-log'`, `'phantom-mock.dnr-match-log'`) is defined in `shared/constants.ts`.
 
 ---
 
@@ -218,6 +221,6 @@ chrome.runtime.onConnect.addListener((port) => {
 1. **Always type messages** — never send untyped objects
 2. **Always handle errors** — check `chrome.runtime.lastError` and catch exceptions
 3. **Return `true` from `onMessage`** — when handler is async (keeps channel open)
-4. **Validate incoming messages** — type guard before processing
-5. **Never assume sender** — verify `sender.tab` or `sender.id` for security
-6. **Handle disconnection** — ports close when popup closes or SW terminates
+4. **Validate incoming messages** — use `isRuntimeMessage()` before processing
+5. **Never assume sender** — verify with `isPrivilegedSender()` / `tabIdMatchesSender()` (both in `background/service-worker.ts`) before trusting a mutation or a tab-scoped cookie request
+6. **Handle disconnection** — ports close when the panel closes or the SW terminates

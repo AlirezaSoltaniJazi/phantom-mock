@@ -1,122 +1,124 @@
 # Test Patterns — phantom-mock
 
-> Vitest setup, Chrome API mocking, DOM testing, and E2E patterns.
+> Vitest setup, Chrome API mocking, and DOM testing patterns actually used in this project.
 
 ---
 
 ## Test Setup
 
+The real global `chrome` mock lives in `tests/setup.ts` and is hand-rolled with `vi.fn()` /
+a small `makeEvent()` helper — there is no `jest-chrome` or similar mocking package as a
+dependency (`package.json` has neither):
+
 ```typescript
-// tests/setup.ts
+// tests/setup.ts (abbreviated — see the real file for the full mock)
 
-import { vi } from 'vitest';
+import { beforeEach, vi } from 'vitest';
 
-// Mock chrome.* APIs globally
-const chromeMock = {
-  runtime: {
-    id: 'test-extension-id',
-    sendMessage: vi.fn(),
-    onMessage: {
-      addListener: vi.fn(),
-      removeListener: vi.fn(),
-      hasListener: vi.fn(),
+function makeEvent<T extends unknown[]>() {
+  const listeners = new Set<(...args: T) => void>();
+  return {
+    addListener: (fn: (...args: T) => void) => listeners.add(fn),
+    removeListener: (fn: (...args: T) => void) => listeners.delete(fn),
+    hasListener: (fn: (...args: T) => void) => listeners.has(fn),
+    clearListeners: () => listeners.clear(),
+    dispatch: (...args: T) => {
+      for (const fn of listeners) fn(...args);
     },
-    onInstalled: {
-      addListener: vi.fn(),
-    },
-    onStartup: {
-      addListener: vi.fn(),
-    },
-    lastError: null as chrome.runtime.LastError | null,
-    getURL: vi.fn((path: string) => `chrome-extension://test-id/${path}`),
-  },
-  storage: {
-    local: {
-      get: vi.fn().mockResolvedValue({}),
-      set: vi.fn().mockResolvedValue(undefined),
-      remove: vi.fn().mockResolvedValue(undefined),
-      getBytesInUse: vi.fn().mockResolvedValue(0),
-    },
-    sync: {
-      get: vi.fn().mockResolvedValue({}),
-      set: vi.fn().mockResolvedValue(undefined),
-    },
-    session: {
-      get: vi.fn().mockResolvedValue({}),
-      set: vi.fn().mockResolvedValue(undefined),
-    },
-    onChanged: {
-      addListener: vi.fn(),
-      removeListener: vi.fn(),
-    },
-  },
-  declarativeNetRequest: {
-    getDynamicRules: vi.fn().mockResolvedValue([]),
-    updateDynamicRules: vi.fn().mockResolvedValue(undefined),
-    MAX_NUMBER_OF_DYNAMIC_RULES: 5000,
-  },
-  tabs: {
-    query: vi.fn().mockResolvedValue([]),
-    sendMessage: vi.fn().mockResolvedValue(undefined),
-  },
-  action: {
-    setBadgeText: vi.fn().mockResolvedValue(undefined),
-    setBadgeBackgroundColor: vi.fn().mockResolvedValue(undefined),
-  },
-  alarms: {
-    create: vi.fn(),
-    clear: vi.fn(),
-    onAlarm: {
-      addListener: vi.fn(),
-    },
-  },
-  contextMenus: {
-    create: vi.fn(),
-    remove: vi.fn(),
-    onClicked: {
-      addListener: vi.fn(),
-    },
-  },
-};
+  };
+}
 
-// Assign to global
-Object.assign(globalThis, { chrome: chromeMock });
+export function createChromeMock() {
+  return {
+    runtime: {
+      sendMessage: vi.fn(),
+      onMessage: makeEvent<[unknown, chrome.runtime.MessageSender, (response?: unknown) => void]>(),
+      onInstalled: makeEvent<[chrome.runtime.InstalledDetails]>(),
+      onStartup: makeEvent<[]>(),
+      onConnect: makeEvent<[chrome.runtime.Port]>(),
+      lastError: undefined as { message: string } | undefined,
+      getURL: vi.fn((path: string) => `chrome-extension://test/${path}`),
+      getManifest: vi.fn(() => ({ name: 'Phantom Mock', version: '0.0.0-test' })),
+    },
+    storage: {
+      local: { get: vi.fn(), set: vi.fn(), remove: vi.fn(), clear: vi.fn() },
+      onChanged:
+        makeEvent<[{ [key: string]: chrome.storage.StorageChange }, chrome.storage.AreaName]>(),
+    },
+    tabs: {
+      query: vi.fn().mockResolvedValue([]),
+      sendMessage: vi.fn().mockResolvedValue(undefined),
+      create: vi.fn().mockResolvedValue({}),
+      get: vi.fn().mockResolvedValue({ id: 1, url: 'https://example.com/' }),
+    },
+    cookies: {
+      get: vi.fn().mockResolvedValue(null),
+      set: vi.fn().mockResolvedValue(null),
+      remove: vi.fn().mockResolvedValue(null),
+      getAll: vi.fn().mockResolvedValue([]),
+    },
+    declarativeNetRequest: {
+      updateDynamicRules: vi.fn().mockResolvedValue(undefined),
+      getDynamicRules: vi.fn().mockResolvedValue([]),
+      HeaderOperation: { SET: 'set', APPEND: 'append', REMOVE: 'remove' },
+      RequestMethod: { GET: 'get', POST: 'post' /* ... */ },
+      ResourceType: { MAIN_FRAME: 'main_frame', SCRIPT: 'script' /* ... */ },
+      RuleActionType: { MODIFY_HEADERS: 'modifyHeaders' },
+    },
+    devtools: {
+      panels: { create: vi.fn() },
+      inspectedWindow: { eval: vi.fn(), reload: vi.fn(), tabId: 1 },
+      network: {
+        onRequestFinished: makeEvent<[chrome.devtools.network.Request]>(),
+        getHAR: vi.fn(),
+      },
+    },
+    scripting: { executeScript: vi.fn().mockResolvedValue([]) },
+  };
+}
 
-// Reset mocks between tests
+const chromeMock = createChromeMock();
+(globalThis as unknown as { chrome: unknown }).chrome = chromeMock;
+
 beforeEach(() => {
   vi.clearAllMocks();
-  chromeMock.runtime.lastError = null;
+  chromeMock.declarativeNetRequest.updateDynamicRules.mockResolvedValue(undefined);
+  chromeMock.declarativeNetRequest.getDynamicRules.mockResolvedValue([]);
 });
 ```
+
+There are no `chrome.alarms` or `chrome.contextMenus` entries in this mock — the project doesn't use either API, so don't add mocks for them unless a new feature actually needs them.
 
 ---
 
 ## Vitest Configuration
 
 ```typescript
-// vitest.config.ts
+// vitest.config.ts (actual, root of the repo)
 
 import { defineConfig } from 'vitest/config';
-import { resolve } from 'path';
+import path from 'node:path';
 
 export default defineConfig({
+  resolve: {
+    alias: { '@': path.resolve(__dirname, 'src') },
+  },
   test: {
     globals: true,
     environment: 'happy-dom',
-    setupFiles: ['./tests/setup.ts'],
+    include: ['tests/**/*.test.ts', 'tests/**/*.test.tsx', 'tests/**/*.test.mjs'],
+    setupFiles: ['tests/setup.ts'],
     coverage: {
       provider: 'v8',
-      include: ['src/**/*.ts'],
-      exclude: ['src/**/*.d.ts', 'src/**/index.html'],
-    },
-  },
-  resolve: {
-    alias: {
-      '@': resolve(__dirname, 'src'),
+      reporter: ['text', 'lcov'],
+      include: ['src/**/*.{ts,tsx}'],
+      exclude: ['src/**/*.d.ts', 'src/**/*.html'],
     },
   },
 });
 ```
+
+Run with `npm test` (`vitest run`) or `npm run test:coverage` (`vitest run --coverage`).
 
 ---
 
@@ -125,205 +127,189 @@ export default defineConfig({
 ### Testing Storage Helpers
 
 ```typescript
-// tests/background/storage.test.ts
+// tests/background/storage.test.ts (actual pattern)
 
-import { describe, it, expect, vi } from 'vitest';
-import { getRules, setRules, getState } from '@/background/storage';
+import { describe, expect, it, vi, type Mock } from 'vitest';
+import { defaultState, getState, setState, updateState } from '@/background/storage';
 import { STORAGE_KEYS } from '@/shared/constants';
 
-describe('storage helpers', () => {
-  describe('getRules', () => {
-    it('returns empty array when no rules stored', async () => {
-      chrome.storage.local.get.mockResolvedValue({});
+const get = chrome.storage.local.get as unknown as Mock;
+const set = chrome.storage.local.set as unknown as Mock;
 
-      const rules = await getRules();
+describe('storage', () => {
+  it('returns defaultState when storage is empty', async () => {
+    get.mockResolvedValue({});
+    set.mockResolvedValue(undefined);
 
-      expect(rules).toEqual([]);
-      expect(chrome.storage.local.get).toHaveBeenCalledWith(STORAGE_KEYS.RULES);
-    });
-
-    it('returns stored rules', async () => {
-      const mockRules = [{ id: 1, url: 'example.com', enabled: true }];
-      chrome.storage.local.get.mockResolvedValue({
-        [STORAGE_KEYS.RULES]: mockRules,
-      });
-
-      const rules = await getRules();
-
-      expect(rules).toEqual(mockRules);
-    });
+    const state = await getState();
+    expect(state).toEqual(defaultState());
+    expect(set).toHaveBeenCalled();
   });
 
-  describe('setRules', () => {
-    it('persists rules to storage', async () => {
-      const rules = [{ id: 1, url: 'example.com', enabled: true }];
-
-      await setRules(rules);
-
-      expect(chrome.storage.local.set).toHaveBeenCalledWith({
-        [STORAGE_KEYS.RULES]: rules,
-      });
+  it('round-trips a state via setState/getState', async () => {
+    const storage: Record<string, unknown> = {};
+    set.mockImplementation(async (items: Record<string, unknown>) => {
+      Object.assign(storage, items);
     });
-  });
-});
-```
+    get.mockImplementation(async (key: string) => ({ [key]: storage[key] }));
 
-### Testing Message Handlers
-
-```typescript
-// tests/background/message-handler.test.ts
-
-import { describe, it, expect, vi } from 'vitest';
-import { handleMessage } from '@/background/message-handler';
-import { MESSAGE_TYPES } from '@/shared/messages';
-
-describe('handleMessage', () => {
-  it('handles ADD_RULE message', async () => {
-    const mockRule = { url: 'api.example.com', action: 'redirect' };
-
-    const result = await handleMessage({
-      type: MESSAGE_TYPES.ADD_RULE,
-      payload: { rule: mockRule },
-    });
-
-    expect(result.success).toBe(true);
-    expect(result.data).toMatchObject({ url: 'api.example.com' });
+    const next = defaultState();
+    next.masterEnabled = false;
+    await setState(next);
+    expect(storage[STORAGE_KEYS.APP_STATE]).toEqual(next);
+    expect((await getState()).masterEnabled).toBe(false);
   });
 
-  it('rejects unknown message types', async () => {
-    const result = await handleMessage({
-      type: 'UNKNOWN_TYPE' as any,
-    });
+  it('updateState applies an updater function', async () => {
+    const storage: Record<string, unknown> = { [STORAGE_KEYS.APP_STATE]: defaultState() };
+    set.mockImplementation(async (items: Record<string, unknown>) => Object.assign(storage, items));
+    get.mockImplementation(async (key: string) => ({ [key]: storage[key] }));
 
-    expect(result.success).toBe(false);
-    expect(result.error).toContain('Unhandled message');
+    const result = await updateState((s) => ({ ...s, masterEnabled: false }));
+    expect(result.masterEnabled).toBe(false);
   });
 });
 ```
 
-### Testing DeclarativeNetRequest Rule Sync
+There is no `getRules()`/`setRules()` pair and no `STORAGE_KEYS.RULES` — rules live inside the single `AppState` object under `STORAGE_KEYS.APP_STATE`.
+
+### Testing Sender/Permission Guards
 
 ```typescript
-// tests/background/rules.test.ts
+// tests/background/sender-guards.test.ts (actual pattern)
 
-import { describe, it, expect } from 'vitest';
-import { syncDeclarativeNetRequestRules } from '@/background/rules';
+import { describe, expect, it } from 'vitest';
+import { isPrivilegedSender, tabIdMatchesSender } from '@/background/service-worker';
 
-describe('syncDeclarativeNetRequestRules', () => {
-  it('removes old rules and adds new ones atomically', async () => {
-    const existingRules = [{ id: 1 }, { id: 2 }];
-    chrome.declarativeNetRequest.getDynamicRules.mockResolvedValue(existingRules);
+function contentScriptSender(tabId: number): chrome.runtime.MessageSender {
+  return {
+    id: 'test',
+    url: 'https://example.com/page',
+    tab: { id: tabId } as chrome.tabs.Tab,
+  } as chrome.runtime.MessageSender;
+}
 
-    const newRules = [
-      { id: 3, url: 'example.com', enabled: true, action: 'block' },
-    ];
-
-    const result = await syncDeclarativeNetRequestRules(newRules);
-
-    expect(result.success).toBe(true);
-    expect(chrome.declarativeNetRequest.updateDynamicRules).toHaveBeenCalledWith({
-      removeRuleIds: [1, 2],
-      addRules: expect.arrayContaining([
-        expect.objectContaining({ id: 3 }),
-      ]),
-    });
+describe('tabIdMatchesSender', () => {
+  it("rejects a content script trying to spoof a different tab's id", () => {
+    expect(tabIdMatchesSender(contentScriptSender(42), 99)).toBe(false);
   });
+});
+```
 
-  it('filters disabled rules', async () => {
-    chrome.declarativeNetRequest.getDynamicRules.mockResolvedValue([]);
+Sender trust is verified with `isPrivilegedSender()` (checks `sender.url`/`sender.origin` against `chrome.runtime.getURL('')`) and `tabIdMatchesSender()` — not a `sender.id === chrome.runtime.id` check.
 
-    const rules = [
-      { id: 1, enabled: true, url: 'a.com', action: 'block' },
-      { id: 2, enabled: false, url: 'b.com', action: 'block' },
-    ];
+### Testing DeclarativeNetRequest Translation
 
-    await syncDeclarativeNetRequestRules(rules);
+```typescript
+// tests/background/rules-dnr.test.ts (actual pattern)
 
-    const call = chrome.declarativeNetRequest.updateDynamicRules.mock.calls[0][0];
-    expect(call.addRules).toHaveLength(1);
-    expect(call.addRules[0].id).toBe(1);
+import { describe, expect, it } from 'vitest';
+import { translateToDnrRules } from '@/background/rules-dnr';
+import { CURRENT_SCHEMA_VERSION, type AppState, type Rule } from '@/shared/types';
+import { DEFAULT_GROUP_ID } from '@/shared/constants';
+
+function makeHeaderRule(overrides: Partial<Rule> = {}): Rule {
+  return {
+    id: 'rule_h',
+    name: 'Header rule',
+    groupId: DEFAULT_GROUP_ID,
+    enabled: true,
+    match: { method: 'GET', urlMatchType: 'contains', urlPattern: '/api/' },
+    action: {
+      kind: 'header',
+      requestHeaders: [{ name: 'X-Phantom', op: 'set', value: 'yes' }],
+      responseHeaders: [{ name: 'X-Trace', op: 'remove' }],
+    },
+    ...overrides,
+  };
+}
+
+function makeState(rules: Rule[], masterEnabled = true): AppState {
+  return {
+    schemaVersion: CURRENT_SCHEMA_VERSION,
+    masterEnabled,
+    groups: [{ id: DEFAULT_GROUP_ID, name: 'Default', enabled: true, order: 0 }],
+    rules,
+    storageProfiles: [],
+    cookieProfiles: [],
+  };
+}
+
+describe('translateToDnrRules', () => {
+  it('returns empty when master is off', () => {
+    expect(translateToDnrRules(makeState([makeHeaderRule()], false))).toEqual([]);
+  });
+});
+```
+
+Note the real names: `translateToDnrRules()` / `syncDnrRules()` / `ruleIdFor()` in `@/background/rules-dnr` — not `syncDeclarativeNetRequestRules()` in a `@/background/rules` module (neither exists).
+
+### Testing Content-Script Guards
+
+```typescript
+// tests/content/runtime.test.ts (actual pattern)
+
+import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
+import { isExtensionContextValid, sendRuntimeMessage } from '@/content/runtime';
+import { MESSAGE_TYPES } from '@/shared/constants';
+
+const runtime = chrome.runtime as unknown as { id?: string | undefined; sendMessage: Mock };
+
+describe('isExtensionContextValid', () => {
+  it('is false when chrome.runtime.id is undefined (orphaned content script)', () => {
+    runtime.id = undefined;
+    expect(isExtensionContextValid()).toBe(false);
   });
 });
 ```
 
 ---
 
-## Content Script DOM Testing
+## Toast / Shadow-DOM Testing
+
+There is no `@/content/ui` module or `injectMockIndicator()`/`removeMockIndicator()` pair in
+this project. Injected UI lives in `content/toast.ts`, which exposes
+`showRuleAppliedToast(ruleName, groupName?)` and `showGroupActivatedToast(groupName)` and builds
+a closed shadow root under a `<div id="phantom-mock-toast-host">`. A test for it would look like:
 
 ```typescript
-// tests/content/ui.test.ts
-
 import { describe, it, expect, beforeEach } from 'vitest';
-import { injectMockIndicator, removeMockIndicator } from '@/content/ui';
+import { showRuleAppliedToast } from '@/content/toast';
 
-describe('content script UI', () => {
+describe('toast', () => {
   beforeEach(() => {
     document.body.innerHTML = '';
+    document.documentElement.querySelector('#phantom-mock-toast-host')?.remove();
   });
 
-  it('injects indicator in shadow DOM', () => {
-    injectMockIndicator();
-
-    const host = document.querySelector('phantom-mock-root');
+  it('creates a closed-shadow host on first toast', () => {
+    showRuleAppliedToast('My Rule');
+    const host = document.getElementById('phantom-mock-toast-host');
     expect(host).not.toBeNull();
-    expect(host?.shadowRoot).not.toBeNull(); // closed shadow — test via side effects
-  });
-
-  it('removes indicator cleanly', () => {
-    injectMockIndicator();
-    removeMockIndicator();
-
-    const host = document.querySelector('phantom-mock-root');
-    expect(host).toBeNull();
+    // shadowRoot is closed — assert via behavior, not `host.shadowRoot`
   });
 });
 ```
 
 ---
 
-## E2E Testing with Playwright
+## E2E Testing
 
-```typescript
-// tests/e2e/extension.spec.ts
-
-import { test, expect, chromium } from '@anthropic-ai/playwright';
-import path from 'path';
-
-const extensionPath = path.resolve(__dirname, '../../dist');
-
-test.describe('phantom-mock extension', () => {
-  test('popup opens and displays rule list', async () => {
-    const context = await chromium.launchPersistentContext('', {
-      headless: false,
-      args: [
-        `--disable-extensions-except=${extensionPath}`,
-        `--load-extension=${extensionPath}`,
-      ],
-    });
-
-    // Get extension ID
-    const [background] = context.serviceWorkers();
-    const extensionId = background.url().split('/')[2];
-
-    // Open popup
-    const popup = await context.newPage();
-    await popup.goto(`chrome-extension://${extensionId}/src/popup/index.html`);
-
-    // Verify popup loaded
-    await expect(popup.locator('[data-testid="rule-list"]')).toBeVisible();
-
-    await context.close();
-  });
-});
-```
+There is currently **no E2E/browser-driven test suite in this project** — no Playwright (or
+any other browser-automation) dependency in `package.json`, and no `tests/e2e/` directory.
+All test coverage is Vitest unit tests under `tests/`, mirroring `src/`. If browser-driven
+extension testing is added later, Playwright's `--load-extension` launch flag (with the real
+`playwright`/`@playwright/test` package, not any `@anthropic-ai/*` package — that scope doesn't
+publish a Playwright package) is the standard approach — but don't write code or docs assuming
+it already exists in this repo.
 
 ---
 
 ## Test Rules
 
-1. **Mock all chrome.* APIs** — never call real Chrome APIs in unit tests
+1. _*Mock all chrome.* APIs_* — never call real Chrome APIs in unit tests
 2. **Reset mocks between tests** — use `beforeEach(() => vi.clearAllMocks())`
-3. **Test message schemas** — verify type discriminants and payload shapes
-4. **Test error paths** — simulate `chrome.runtime.lastError`, network failures, quota exceeded
-5. **Use `happy-dom`** for content script tests — lighter than `jsdom`
-6. **E2E for integration** — use Playwright with `--load-extension` for full flows
+3. **Test message schemas** — verify `isRuntimeMessage()` and the `RuntimeMessage`/`StateMutation` discriminants
+4. **Test error paths** — simulate `chrome.runtime.lastError`, rejected promises, malformed stored state
+5. **Use `happy-dom`** (configured in `vitest.config.ts`) — this project does not use `jsdom`
+6. **No E2E today** — see above; don't reference Playwright as if it's already wired up

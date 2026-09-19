@@ -25,6 +25,7 @@ When the user corrects a mistake:
 
 ```markdown
 ## Corrections
+
 - 2026-05-16: Never use innerHTML in content scripts — always textContent or DOM API
 - 2026-05-16: declarativeNetRequest rules must have resourceTypes — not optional
 ```
@@ -41,9 +42,9 @@ When the user corrects a mistake:
 
 ### 2. Encourage User Independence
 
-- Explain *why* a pattern works, not just *what* to do
+- Explain _why_ a pattern works, not just _what_ to do
 - Reference Chrome extension docs for deeper learning
-- Point to project examples: "See how `background/rules.ts` handles this"
+- Point to project examples: "See how `background/rules-dnr.ts` handles this"
 
 ### 3. Graceful Degradation
 
@@ -55,12 +56,12 @@ When the user corrects a mistake:
 
 ## Proficiency Calibration
 
-| Signal                                     | Inferred Level  | Behavior                                          |
-| ------------------------------------------ | --------------- | ------------------------------------------------- |
-| "How do I make a Chrome extension?"        | Beginner        | Explain fundamentals, link to docs, full context  |
-| "Add another rule type like REDIRECT"      | Intermediate    | Copy pattern, minimal explanation                 |
-| "The SW is dropping onMessage events"      | Advanced        | Dive into lifecycle, check listener registration  |
-| "Optimize declarativeNetRequest priority"  | Expert          | Concise answer, assume context understood         |
+| Signal                                    | Inferred Level | Behavior                                         |
+| ----------------------------------------- | -------------- | ------------------------------------------------ |
+| "How do I make a Chrome extension?"       | Beginner       | Explain fundamentals, link to docs, full context |
+| "Add another rule type like REDIRECT"     | Intermediate   | Copy pattern, minimal explanation                |
+| "The SW is dropping onMessage events"     | Advanced       | Dive into lifecycle, check listener registration |
+| "Optimize declarativeNetRequest priority" | Expert         | Concise answer, assume context understood        |
 
 ---
 
@@ -78,13 +79,13 @@ Don't lecture — just briefly note what convention applies and apply it.
 
 ## Research-Backed Anti-Patterns
 
-| Anti-Pattern              | Problem                                               | Mitigation                                      |
-| ------------------------- | ----------------------------------------------------- | ----------------------------------------------- |
-| Sycophantic agreement     | Validating wrong approaches to please                 | Politely correct with evidence                  |
-| Confidence without basis  | Stating Chrome API behavior without verification      | Say "I believe..." or verify in docs            |
-| Pattern overfitting       | Applying MV2 patterns to MV3 context                  | Always verify against manifest_version: 3       |
-| Complexity escalation     | Adding features/abstractions user didn't ask for      | Solve the stated problem, suggest extras after  |
-| Stale knowledge           | Using deprecated APIs (webRequest blocking, MV2)      | Cross-reference with MV3 migration docs         |
+| Anti-Pattern             | Problem                                          | Mitigation                                     |
+| ------------------------ | ------------------------------------------------ | ---------------------------------------------- |
+| Sycophantic agreement    | Validating wrong approaches to please            | Politely correct with evidence                 |
+| Confidence without basis | Stating Chrome API behavior without verification | Say "I believe..." or verify in docs           |
+| Pattern overfitting      | Applying MV2 patterns to MV3 context             | Always verify against manifest_version: 3      |
+| Complexity escalation    | Adding features/abstractions user didn't ask for | Solve the stated problem, suggest extras after |
+| Stale knowledge          | Using deprecated APIs (webRequest blocking, MV2) | Cross-reference with MV3 migration docs        |
 
 ---
 

@@ -102,13 +102,12 @@ Typed message protocol for Chrome runtime messaging. Twelve message types: `GET_
 
 Phantom Mock is entirely client-side with no backend, database, or third-party API calls.
 
-| Dependency                     | Protocol             | Integration                                                 |
-| ------------------------------ | -------------------- | ----------------------------------------------------------- |
-| `chrome.storage.local`         | Chrome Storage API   | `src/background/storage.ts`, `src/shared/prefs.ts`          |
-| `chrome.storage.session`       | Chrome Storage API   | `src/devtools/devtools.ts` (capture buffer)                 |
-| `chrome.declarativeNetRequest` | Chrome DNR API       | `src/background/rules-dnr.ts`                               |
-| `chrome.devtools.network`      | Chrome DevTools API  | `src/devtools/devtools.ts` (HAR capture)                    |
-| `chrome.runtime`               | Chrome Runtime API   | Message passing across all contexts                         |
-| `chrome.tabs`                  | Chrome Tabs API      | `src/background/service-worker.ts` (broadcast to tabs)      |
-| `chrome.cookies`               | Chrome Cookies API   | `src/background/cookies.ts` (Cookies tab profile switching) |
-| `chrome.scripting`             | Chrome Scripting API | Permission declared for content script injection            |
+| Dependency                     | Protocol            | Integration                                                 |
+| ------------------------------ | ------------------- | ----------------------------------------------------------- |
+| `chrome.storage.local`         | Chrome Storage API  | `src/background/storage.ts`, `src/shared/prefs.ts`          |
+| `chrome.storage.session`       | Chrome Storage API  | `src/devtools/devtools.ts` (capture buffer)                 |
+| `chrome.declarativeNetRequest` | Chrome DNR API      | `src/background/rules-dnr.ts`                               |
+| `chrome.devtools.network`      | Chrome DevTools API | `src/devtools/devtools.ts` (HAR capture)                    |
+| `chrome.runtime`               | Chrome Runtime API  | Message passing across all contexts                         |
+| `chrome.tabs`                  | Chrome Tabs API     | `src/background/service-worker.ts` (broadcast to tabs)      |
+| `chrome.cookies`               | Chrome Cookies API  | `src/background/cookies.ts` (Cookies tab profile switching) |

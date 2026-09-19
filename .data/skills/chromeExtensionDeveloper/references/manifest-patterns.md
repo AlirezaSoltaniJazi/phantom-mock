@@ -22,6 +22,7 @@ This mirrors the project's actual `manifest.json` (root of the repo) — keep th
   },
   "action": {
     "default_popup": "src/popup/index.html",
+    "default_title": "Phantom Mock",
     "default_icon": {
       "16": "public/icons/icon-16.png",
       "32": "public/icons/icon-32.png",

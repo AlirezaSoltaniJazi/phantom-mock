@@ -25,8 +25,8 @@ src/
 ├── content/             # Content script (isolated world) — bridges page ↔ service worker
 ├── injected/            # Page-world script (MAIN) — patches fetch/XHR, matches rules
 ├── popup/               # Browser action popup — master toggle, rule counts
-├── devtools/            # DevTools panel — Rules, Editor, Hits, Capture, Settings tabs
-│   ├── components/      # Tab components (RuleEditor, RulesTable, HitLog, Settings)
+├── devtools/            # DevTools panel — Rules, Groups, Editor, Storage, Storage Editor, Cookies, Cookies Editor, Hit Log, Debug, Capture, Settings tabs
+│   ├── components/      # Tab components (RuleEditor, RulesTable, GroupsTable, StorageTab, CookiesTab, HitLog, DnrDebug, Settings)
 │   └── capture/         # Network capture + promote-to-rule workflow
 ├── shared/              # Types, messages, constants, matcher, import/export
 └── utils/               # ID generation, helpers
@@ -120,21 +120,21 @@ Never use deep relative paths (`../../`) — always use `@/` aliases.
 
 ## Files To Know
 
-| File                                     | Purpose                                                         |
-| ---------------------------------------- | --------------------------------------------------------------- |
-| `src/background/service-worker.ts`       | Message hub — handles all runtime messages, applies mutations   |
-| `src/background/storage.ts`              | Typed chrome.storage.local wrapper with subscribe pattern       |
-| `src/background/rules-dnr.ts`            | Translates rules → declarativeNetRequest format                 |
-| `src/shared/types.ts`                    | All core types: Rule, Group, AppState, MockAction, HeaderAction |
-| `src/shared/messages.ts`                 | RuntimeMessage union, sendMessage helper, type guards           |
-| `src/shared/constants.ts`                | Storage keys, message types, port names, limits                 |
-| `src/shared/matcher.ts`                  | URL/method matching (exact, contains, regex)                    |
-| `src/injected/page-mock.ts`              | Patches fetch/XHR in page world, returns mock responses         |
-| `src/devtools/panel.tsx`                 | Main DevTools React app with tab routing                        |
-| `src/devtools/components/RuleEditor.tsx` | Full CRUD form for rule creation/editing                        |
-| `manifest.json`                          | Chrome extension manifest — permissions, entry points           |
-| `vite.config.ts`                         | Build config — CRXJS plugin, path aliases, dev server           |
-| `tests/setup.ts`                         | Chrome API mocks for all test files                             |
+| File                                     | Purpose                                                                                        |
+| ---------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| `src/background/service-worker.ts`       | Message hub — handles all runtime messages, applies mutations                                  |
+| `src/background/storage.ts`              | Typed chrome.storage.local wrapper with subscribe pattern                                      |
+| `src/background/rules-dnr.ts`            | Translates rules → declarativeNetRequest format                                                |
+| `src/shared/types.ts`                    | All core types: Rule, Group, StorageProfile, CookieProfile, AppState, MockAction, HeaderAction |
+| `src/shared/messages.ts`                 | RuntimeMessage union, sendMessage helper, type guards                                          |
+| `src/shared/constants.ts`                | Storage keys, message types, port names, limits                                                |
+| `src/shared/matcher.ts`                  | URL/method matching (exact, contains, regex, template)                                         |
+| `src/injected/page-mock.ts`              | Patches fetch/XHR in page world, returns mock responses                                        |
+| `src/devtools/panel.tsx`                 | Main DevTools React app with tab routing                                                       |
+| `src/devtools/components/RuleEditor.tsx` | Full CRUD form for rule creation/editing                                                       |
+| `manifest.json`                          | Chrome extension manifest — permissions, entry points                                          |
+| `vite.config.ts`                         | Build config — CRXJS plugin, path aliases, dev server                                          |
+| `tests/setup.ts`                         | Chrome API mocks for all test files                                                            |
 
 ## Files To Never Touch
 

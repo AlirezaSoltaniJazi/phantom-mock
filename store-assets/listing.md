@@ -63,7 +63,7 @@ everything lives in your browser's local storage.
 ## Tags / keywords
 
 mock, rest, api, http, fetch, xhr, headers, devtools, testing, proxy,
-cookies, localStorage, sessionStorage, locale, feature-flags, tenant
+cookies, localStorage, locale, feature-flags, tenant
 
 ## Support URL
 

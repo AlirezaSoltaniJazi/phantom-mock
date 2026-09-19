@@ -8,7 +8,7 @@ description: >-
   scripts, configuring permissions, implementing chrome.* APIs, debugging
   extension behavior, building popup/options UI, or managing Chrome Web Store
   publishing.
-compatibility: 'Chrome MV3, TypeScript 5+, Vite + CRXJS, Vitest, ESLint, Prettier'
+compatibility: 'Chrome MV3, TypeScript 6+, Vite + CRXJS, Vitest, ESLint, Prettier'
 metadata:
   author: phantom-mock
   version: '1.0.0'
@@ -91,38 +91,38 @@ phantom-mock/
 
 ## Key Patterns
 
-| Pattern                  | Approach                                          | Key Rule                                                |
-| ------------------------ | ------------------------------------------------- | ------------------------------------------------------- |
-| Request interception     | `chrome.declarativeNetRequest` with dynamic rules | Never use webRequest blocking in MV3                    |
-| State management         | `chrome.storage.local` with typed wrappers        | Always use typed get/set helpers, never raw API         |
-| Message passing          | Typed schemas via `chrome.runtime.sendMessage`    | Every message has `type` discriminant + typed payload   |
-| Service worker lifecycle | Event-driven with `chrome.alarms` for persistence | Never assume SW stays alive — recover state on wake     |
-| Content script UI        | Shadow DOM isolation                              | Never pollute page global styles or namespace           |
-| Popup communication      | One-time messages to service worker               | Always handle `chrome.runtime.lastError`                |
-| Rule storage             | Typed rule objects in chrome.storage.local        | Validate rules before applying to declarativeNetRequest |
-| Error handling           | Result objects `{ success, data?, error? }`       | Never throw in async chrome API callbacks               |
+| Pattern                  | Approach                                                                                                               | Key Rule                                                |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
+| Request interception     | `chrome.declarativeNetRequest` with dynamic rules                                                                      | Never use webRequest blocking in MV3                    |
+| State management         | `chrome.storage.local` with typed wrappers                                                                             | Always use typed get/set helpers, never raw API         |
+| Message passing          | Typed schemas via `chrome.runtime.sendMessage`                                                                         | Every message has `type` discriminant + typed payload   |
+| Service worker lifecycle | Event-driven — recover via `onInstalled`/`onStartup` + `storage.onChanged` (this project does NOT use `chrome.alarms`) | Never assume SW stays alive — recover state on wake     |
+| Content script UI        | Shadow DOM isolation                                                                                                   | Never pollute page global styles or namespace           |
+| Popup communication      | One-time messages to service worker                                                                                    | Always handle `chrome.runtime.lastError`                |
+| Rule storage             | Typed rule objects in chrome.storage.local                                                                             | Validate rules before applying to declarativeNetRequest |
+| Error handling           | Result objects `{ ok: true, value } \| { ok: false, error }`                                                           | Never throw in async chrome API callbacks               |
 
 See [references/manifest-patterns.md](references/manifest-patterns.md) for full code examples.
 
 ## Code Style
 
-| Rule               | Convention                                                         |
-| ------------------ | ------------------------------------------------------------------ |
-| Language           | TypeScript 5+ strict mode (`strict: true` in tsconfig)             |
-| Formatter          | Prettier (2 spaces, single quotes, trailing commas)                |
-| Linter             | ESLint with @typescript-eslint, no-floating-promises               |
-| Import style       | Path aliases (`@/` for `src/`) — never deep relative (`../../`)    |
-| Import order       | builtin -> external -> @/ aliases -> relative (auto-sorted)        |
-| Type hints         | Explicit return types on all exported functions                    |
-| Naming — files     | `kebab-case.ts` for modules, `PascalCase.tsx` for components       |
-| Naming — types     | `PascalCase` (e.g., `MockRule`, `MessagePayload`)                  |
-| Naming — functions | `camelCase` with descriptive verbs (`createRule`, `handleMessage`) |
-| Naming — constants | `SCREAMING_SNAKE_CASE` (e.g., `MAX_RULES`, `STORAGE_KEYS`)         |
-| Naming — messages  | `SCREAMING_SNAKE_CASE` type discriminants (`ADD_RULE`, `TOGGLE`)   |
-| Exports            | Named exports only — never default exports                         |
-| Strings            | Single quotes (enforced by Prettier)                               |
-| No `any`           | Use `unknown` + type guards — `any` is forbidden                   |
-| Async              | Always `async/await` — never raw `.then()` chains                  |
+| Rule               | Convention                                                                                                                                                       |
+| ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Language           | TypeScript 6+ strict mode (`strict: true` in tsconfig)                                                                                                           |
+| Formatter          | Prettier (2 spaces, single quotes, trailing commas)                                                                                                              |
+| Linter             | ESLint 10 flat config (`eslint.config.mjs`) — `@typescript-eslint` recommended rules, `eqeqeq`, `no-throw-literal`; `no-explicit-any` is a warning, not an error |
+| Import style       | Path aliases (`@/` for `src/`) — never deep relative (`../../`)                                                                                                  |
+| Import order       | builtin -> external -> @/ aliases -> relative (auto-sorted)                                                                                                      |
+| Type hints         | Explicit return types on all exported functions                                                                                                                  |
+| Naming — files     | `kebab-case.ts` for modules, `PascalCase.tsx` for components                                                                                                     |
+| Naming — types     | `PascalCase` (e.g., `Rule`, `AppState`, `StateMutation`)                                                                                                         |
+| Naming — functions | `camelCase` with descriptive verbs (`getState`, `syncDnrRules`)                                                                                                  |
+| Naming — constants | `SCREAMING_SNAKE_CASE` (e.g., `MAX_RULES`, `STORAGE_KEYS`)                                                                                                       |
+| Naming — messages  | `SCREAMING_SNAKE_CASE` type discriminants (`GET_STATE`, `MUTATE_STATE`)                                                                                          |
+| Exports            | Named exports only — never default exports                                                                                                                       |
+| Strings            | Single quotes (enforced by Prettier)                                                                                                                             |
+| No `any`           | Use `unknown` + type guards — `any` is forbidden                                                                                                                 |
+| Async              | Always `async/await` — never raw `.then()` chains                                                                                                                |
 
 See [references/code-style.md](references/code-style.md) for full formatting examples.
 
@@ -132,28 +132,28 @@ See [references/code-style.md](references/code-style.md) for full formatting exa
 2. **Add a new chrome API permission**: Add to `manifest.json` permissions array -> add justification comment -> update `references/manifest-patterns.md` -> test in isolation
 3. **Create a new content script**: Add entry in manifest `content_scripts` -> create `src/content/feature.ts` -> use Shadow DOM for any UI -> register message listener -> test with mock DOM
 4. **Add a context menu item**: Register in service worker `chrome.runtime.onInstalled` -> handle click in `chrome.contextMenus.onClicked` -> send result via messaging
-5. **Add storage migration**: Create versioned migration in `background/storage.ts` -> run on `chrome.runtime.onInstalled` with `reason === 'update'` -> validate before + after
-6. **Add new message type**: Add type to `MessageType` enum -> define payload interface -> add handler in receiver -> add sender helper function -> update tests
+5. **Add storage migration**: Extend the `migrate()` function in `background/storage.ts` — it runs additively on every `getState()` read (not gated on `chrome.runtime.onInstalled`'s `reason === 'update'`); only bump `CURRENT_SCHEMA_VERSION` in `shared/types.ts` for a genuine on-disk shape break -> validate before + after
+6. **Add new message type**: Add the discriminant to `MESSAGE_TYPES` in `shared/constants.ts` -> add the variant to the `RuntimeMessage` union in `shared/messages.ts` -> add a `case` in the `chrome.runtime.onMessage` listener in `background/service-worker.ts` -> update tests
 
 ## Testing Standards
 
-| Rule             | Convention                                                      |
-| ---------------- | --------------------------------------------------------------- |
-| Framework        | Vitest with `@anthropic-ai/chrome-types` or `jest-chrome` mocks |
-| Test file naming | `*.test.ts` co-located or in `tests/` mirror                    |
-| Chrome API mocks | Global mock setup in `tests/setup.ts`                           |
-| DOM testing      | `happy-dom` or `jsdom` for content script tests                 |
-| E2E              | Playwright with `--load-extension` for integration              |
-| What to mock     | All chrome.\* APIs, fetch/XMLHttpRequest, DOM when expensive    |
-| What NOT to mock | Type construction, pure utility functions, message schemas      |
-| Coverage target  | Service worker logic 80%+, message handlers 90%+                |
+| Rule             | Convention                                                                                                   |
+| ---------------- | ------------------------------------------------------------------------------------------------------------ |
+| Framework        | Vitest, typed against `@types/chrome`                                                                        |
+| Test file naming | `*.test.ts` in `tests/`, mirroring the `src/` directory layout                                               |
+| Chrome API mocks | Hand-rolled `chrome` global mock built in `tests/setup.ts` (`createChromeMock()`, `vi.fn()` per API)         |
+| DOM testing      | `happy-dom` (configured in `vitest.config.ts`) for content/devtools tests                                    |
+| E2E              | Not currently set up — no Playwright/browser-driven tests in this project; all coverage is Vitest unit tests |
+| What to mock     | All chrome.\* APIs, fetch/XMLHttpRequest, DOM when expensive                                                 |
+| What NOT to mock | Type construction, pure utility functions, message schemas                                                   |
+| Coverage target  | Service worker logic 80%+, message handlers 90%+                                                             |
 
 See [references/test-patterns.md](references/test-patterns.md) for full test examples.
 
 ## Performance Rules
 
-- Use `chrome.scripting.executeScript` for lazy injection — avoid declaring all content scripts in manifest
-- Minimize service worker wake-ups — batch storage operations, use `chrome.alarms` sparingly
+- This project deliberately declares both content scripts statically in `manifest.json` (not via lazy `chrome.scripting.executeScript`) so they run at `document_start` on every page — lazy injection would miss the early `fetch`/`XHR` calls the whole extension exists to intercept; don't "optimize" this to lazy injection
+- Minimize service worker wake-ups — batch storage operations (this project has no `chrome.alarms` usage to worry about)
 - Use `chrome.declarativeNetRequest` over `webRequest` — it's faster and doesn't wake the SW per request
 - Debounce DOM observations in content scripts — MutationObserver can fire rapidly
 - Avoid storing large objects in `chrome.storage.sync` (100KB quota) — use `.local` for bulk data
@@ -167,25 +167,25 @@ See [references/test-patterns.md](references/test-patterns.md) for full test exa
 - Restrict `externally_connectable` to specific origins — never use wildcard
 - Minimize `web_accessible_resources` exposure — only expose what content scripts need
 - Sanitize all user input before injecting into DOM (even in Shadow DOM)
-- Use `activeTab` permission over broad `<all_urls>` host_permissions when possible
+- Use `activeTab` permission over broad `<all_urls>` host_permissions when possible for NEW features — but this project's existing `<all_urls>` is an intentional, justified exception (see PRIVACY.md); don't flag or try to narrow it
 - Never store sensitive data in `chrome.storage.sync` — it syncs to Google account
 
 See [references/security-checklist.md](references/security-checklist.md) for detailed checklists.
 
 ## Anti-Patterns
 
-| Anti-Pattern                               | Why It's Wrong                                              |
-| ------------------------------------------ | ----------------------------------------------------------- |
-| Using `chrome.webRequest` for blocking     | Deprecated in MV3 — use `declarativeNetRequest`             |
-| Using `eval()` or `new Function()`         | Blocked by MV3 CSP — causes extension to fail silently      |
-| Storing state in service worker memory     | SW terminates unpredictably — state is lost                 |
-| Using `any` type for messages              | Loses type safety — bugs in message handling go undetected  |
-| Broad `<all_urls>` host_permissions        | Chrome Web Store rejects or delays review — use `activeTab` |
-| Raw `chrome.storage.get/set` without types | No validation — corrupt data silently breaks extension      |
-| Polling in service worker (`setInterval`)  | Prevents SW from sleeping — use `chrome.alarms` instead     |
-| Default exports                            | Breaks tree-shaking and makes refactoring harder            |
-| Deep relative imports (`../../../`)        | Fragile and unreadable — use `@/` path aliases              |
-| Injecting styles without Shadow DOM        | Pollutes host page CSS — breaks both extension and page     |
+| Anti-Pattern                                          | Why It's Wrong                                                                                                                                                                                   |
+| ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Using `chrome.webRequest` for blocking                | Deprecated in MV3 — use `declarativeNetRequest`                                                                                                                                                  |
+| Using `eval()` or `new Function()`                    | Blocked by MV3 CSP — causes extension to fail silently                                                                                                                                           |
+| Storing state in service worker memory                | SW terminates unpredictably — state is lost                                                                                                                                                      |
+| Using `any` type for messages                         | Loses type safety — bugs in message handling go undetected                                                                                                                                       |
+| Broad `<all_urls>` host_permissions for a NEW feature | Chrome Web Store rejects or delays review — use `activeTab` (this project's own existing `<all_urls>` is a documented, justified exception — see PRIVACY.md — not itself an anti-pattern to fix) |
+| Raw `chrome.storage.get/set` without types            | No validation — corrupt data silently breaks extension                                                                                                                                           |
+| Polling in service worker (`setInterval`)             | Prevents SW from sleeping — use `chrome.alarms` instead                                                                                                                                          |
+| Default exports                                       | Breaks tree-shaking and makes refactoring harder                                                                                                                                                 |
+| Deep relative imports (`../../../`)                   | Fragile and unreadable — use `@/` path aliases                                                                                                                                                   |
+| Injecting styles without Shadow DOM                   | Pollutes host page CSS — breaks both extension and page                                                                                                                                          |
 
 ## Code Generation Rules
 
@@ -227,11 +227,11 @@ Corrections and preferences persist via [LEARNED.md](LEARNED.md).
 
 ## Freedom Levels
 
-| Level             | Scope                                                                           | Examples                                                          |
-| ----------------- | ------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
-| **MUST** follow   | Typed messages, no `any`, declarativeNetRequest, Shadow DOM, path aliases       | "MUST type all messages", "MUST use declarativeNetRequest in MV3" |
-| **SHOULD** follow | Named exports, explicit return types, co-located tests, chrome.storage wrappers | "SHOULD export named", "SHOULD wrap chrome.storage calls"         |
-| **CAN** customize | Component structure, test organization, popup framework choice                  | "CAN use React/Preact/Solid for popup", "CAN group tests by file" |
+| Level             | Scope                                                                                                | Examples                                                          |
+| ----------------- | ---------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| **MUST** follow   | Typed messages, no `any`, declarativeNetRequest, Shadow DOM, path aliases                            | "MUST type all messages", "MUST use declarativeNetRequest in MV3" |
+| **SHOULD** follow | Named exports, explicit return types, tests mirroring `src/` under `tests/`, chrome.storage wrappers | "SHOULD export named", "SHOULD wrap chrome.storage calls"         |
+| **CAN** customize | Component structure, test organization, popup framework choice                                       | "CAN use React/Preact/Solid for popup", "CAN group tests by file" |
 
 ## References
 
