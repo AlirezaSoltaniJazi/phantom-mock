@@ -21,11 +21,25 @@ export async function setState(state: AppState): Promise<void> {
   await chrome.storage.local.set({ [STORAGE_KEYS.APP_STATE]: state });
 }
 
-export async function updateState(updater: (current: AppState) => AppState): Promise<AppState> {
-  const current = await getState();
-  const next = updater(current);
-  await setState(next);
-  return next;
+// `getState()` + `setState()` is a read-modify-write, so two overlapping
+// `updateState()` calls (e.g. two rule deletions fired back-to-back before
+// either commits) can both read the same pre-mutation snapshot; whichever
+// `setState()` lands last then overwrites the other's change wholesale,
+// silently "resurrecting" whatever the earlier call removed. `queue` chains
+// every call after the previous one's full read-modify-write cycle so each
+// updater always sees the other's committed result. A rejected cycle still
+// unblocks the queue (via `.catch`) so one failed update can't wedge the rest.
+let queue: Promise<unknown> = Promise.resolve();
+
+export function updateState(updater: (current: AppState) => AppState): Promise<AppState> {
+  const result = queue.then(async () => {
+    const current = await getState();
+    const next = updater(current);
+    await setState(next);
+    return next;
+  });
+  queue = result.catch(() => undefined);
+  return result;
 }
 
 export function subscribe(listener: (next: AppState) => void): () => void {
