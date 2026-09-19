@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-09-19
+
 ### Fixed
 
 - Deleting or editing several rules in quick succession could silently bring
@@ -191,6 +193,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Initial project setup.
 
-[Unreleased]: https://github.com/AlirezaSoltaniJazi/phantom-mock/compare/v0.7.1...HEAD
+[Unreleased]: https://github.com/AlirezaSoltaniJazi/phantom-mock/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/AlirezaSoltaniJazi/phantom-mock/compare/v0.7.1...v1.0.0
 [0.7.1]: https://github.com/AlirezaSoltaniJazi/phantom-mock/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/AlirezaSoltaniJazi/phantom-mock/releases/tag/v0.7.0
