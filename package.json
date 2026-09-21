@@ -36,7 +36,7 @@
     "@crxjs/vite-plugin": "^2.7.1",
     "@eslint/js": "^10.0.1",
     "@types/chrome": "^0.2.2",
-    "@types/node": "^25.9.0",
+    "@types/node": "^26.6.1",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.4",
     "@typescript-eslint/eslint-plugin": "^8.65.0",
