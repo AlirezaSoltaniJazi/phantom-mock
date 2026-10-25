@@ -217,16 +217,16 @@ Source-map of every module in the project. Use this to find the right file to re
 
 ### `devtools/capture/Capture.tsx`
 
-- **Purpose**: Network capture UI — filterable grid with domain/subdomain grouping, column customization, promote-to-rule action
+- **Purpose**: Network capture UI — filterable grid with domain/subdomain grouping, column customization, filters/export panels, promote-to-rule action
 - **Entry point**: `Capture` component
-- **Calls**: `devtools/capture/types.ts`, `devtools/capture/PromoteToRule.tsx`, `shared/url-parts.ts`, `shared/messages.ts`
+- **Calls**: `devtools/capture/types.ts`, `devtools/capture/filters.ts`, `devtools/capture/FiltersPanel.tsx`, `devtools/capture/ExportPanel.tsx`, `devtools/capture/PromoteToRule.tsx`, `shared/url-parts.ts`, `shared/messages.ts`
 - **Called by**: `devtools/panel.tsx`
 
 ### `devtools/capture/use-capture.ts`
 
-- **Purpose**: React hook managing capture buffer — reads from session storage, supports host filtering, HAR import, recording toggle
+- **Purpose**: React hook managing capture buffer — reads from session storage, supports host filtering, exclusion/type/uniqueness filtering, HAR import, recording toggle
 - **Entry point**: `useCapture()` hook
-- **Calls**: `shared/constants.ts`, `utils/id.ts`, `devtools/capture/types.ts`
+- **Calls**: `shared/constants.ts`, `utils/id.ts`, `devtools/capture/types.ts`, `devtools/capture/filters.ts`
 - **Called by**: `devtools/panel.tsx`
 
 ### `devtools/capture/PromoteToRule.tsx`
@@ -236,9 +236,37 @@ Source-map of every module in the project. Use this to find the right file to re
 - **Calls**: `shared/types.ts`, `shared/messages.ts`
 - **Called by**: `devtools/capture/Capture.tsx`
 
+### `devtools/capture/filters.ts`
+
+- **Purpose**: Capture filtering logic — resource-type classification, exclusion matching (domain/path/contains/regex/extension/method/status), uniqueness keys and dedupe
+- **Entry point**: `applyCaptureFilters()`, `shouldCapture()`, `classifyResourceType()`
+- **Calls**: `shared/matcher.ts`, `shared/types.ts`, `devtools/capture/types.ts`
+- **Called by**: `devtools/devtools.ts`, `devtools/capture/use-capture.ts`, `devtools/capture/Capture.tsx`
+
+### `devtools/capture/export.ts`
+
+- **Purpose**: Turns captured entries into downloadable artifacts — curl command, per-request markdown, combined markdown, JSON, zip
+- **Entry point**: `buildExport()`, `downloadArtifact()`
+- **Calls**: `shared/types.ts`, `shared/zip.ts`, `devtools/capture/types.ts`
+- **Called by**: `devtools/capture/ExportPanel.tsx`
+
+### `devtools/capture/FiltersPanel.tsx`
+
+- **Purpose**: Editor for capture exclusions, resource-type toggles and uniqueness settings (persisted in UI prefs)
+- **Entry point**: `FiltersPanel` component
+- **Calls**: `shared/types.ts`, `utils/id.ts`
+- **Called by**: `devtools/capture/Capture.tsx`
+
+### `devtools/capture/ExportPanel.tsx`
+
+- **Purpose**: Field/format/scope picker for exporting captured requests
+- **Entry point**: `ExportPanel` component
+- **Calls**: `shared/types.ts`, `devtools/capture/export.ts`
+- **Called by**: `devtools/capture/Capture.tsx`
+
 ### `devtools/capture/types.ts`
 
-- **Purpose**: `CapturedEntry` and `CapturedHeader` interfaces, plus helpers (`formatDuration`, `matchesHostFilter`, `approxBodySize`)
+- **Purpose**: `CapturedEntry` and `CapturedHeader` interfaces, plus helpers (`formatDuration`, `matchesHostFilter`, `approxBodySize`, `responseSizeBytes`, `formatBytes`)
 - **Entry point**: Type exports
 - **Calls**: None
 - **Called by**: `devtools/devtools.ts`, `devtools/capture/use-capture.ts`, `devtools/capture/Capture.tsx`
@@ -315,7 +343,7 @@ Source-map of every module in the project. Use this to find the right file to re
 - **Purpose**: UI preferences CRUD — `getPrefs()`, `setPrefs()`, `updatePrefs()`, `subscribePrefs()` backed by chrome.storage.local
 - **Entry point**: `getPrefs()`, `updatePrefs()`
 - **Calls**: `shared/types.ts`, `shared/constants.ts`
-- **Called by**: `content/index.ts`, `devtools/components/Settings.tsx`
+- **Called by**: `content/index.ts`, `devtools/components/Settings.tsx`, `devtools/devtools.ts`
 
 ### `shared/use-prefs.ts`
 
@@ -330,6 +358,13 @@ Source-map of every module in the project. Use this to find the right file to re
 - **Entry point**: `deriveUrlParts()`, `bucketByBaseDomain()`
 - **Calls**: `shared/types.ts`
 - **Called by**: `popup/main.tsx`, `devtools/capture/Capture.tsx`, `devtools/components/RulesTable.tsx`
+
+### `shared/zip.ts`
+
+- **Purpose**: Dependency-free store-only ZIP writer (`createZip()`, `crc32()`) so a multi-file export downloads as one archive
+- **Entry point**: `createZip()`
+- **Calls**: None
+- **Called by**: `devtools/capture/export.ts`
 
 ## Utils
 

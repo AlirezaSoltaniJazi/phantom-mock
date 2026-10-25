@@ -1,5 +1,8 @@
 import { STORAGE_KEYS } from '@/shared/constants';
+import { getPrefs, subscribePrefs } from '@/shared/prefs';
+import { DEFAULT_CAPTURE_FILTERS, type CaptureFilters } from '@/shared/types';
 import { newId } from '@/utils/id';
+import { classifyResourceType, shouldCapture, uniqueKeyOf } from './capture/filters';
 import type { CapturedEntry, CapturedHeader } from './capture/types';
 
 // When the extension is reloaded while DevTools is still open, this old
@@ -44,6 +47,27 @@ const WRITE_DEBOUNCE_MS = 150;
 let buffer: CapturedEntry[] = [];
 let recording = true;
 let pendingWrite: ReturnType<typeof setTimeout> | null = null;
+// Exclusions, resource-type toggles and uniqueness live in UI prefs
+// (chrome.storage.local) so they survive a browser restart. Applying them here,
+// at capture time, keeps noise out of the 100-entry ring buffer instead of just
+// hiding it in the panel.
+let filters: CaptureFilters = {
+  excludes: [],
+  types: { ...DEFAULT_CAPTURE_FILTERS.types },
+  unique: { ...DEFAULT_CAPTURE_FILTERS.unique },
+  ignoreOptions: DEFAULT_CAPTURE_FILTERS.ignoreOptions,
+};
+
+safe(() => {
+  void getPrefs()
+    .then((prefs) => {
+      filters = prefs.captureFilters;
+    })
+    .catch(() => undefined);
+  subscribePrefs((prefs) => {
+    filters = prefs.captureFilters;
+  });
+});
 
 safe(() => {
   void chrome.storage.session
@@ -108,6 +132,10 @@ function truncate(text: string | null): string | null {
 }
 
 function appendEntry(entry: CapturedEntry): void {
+  if (filters.unique.enabled) {
+    const key = uniqueKeyOf(entry, filters.unique);
+    if (buffer.some((e) => uniqueKeyOf(e, filters.unique) === key)) return;
+  }
   buffer.push(entry);
   if (buffer.length > MAX_ENTRIES) buffer.splice(0, buffer.length - MAX_ENTRIES);
   scheduleWrite();
@@ -119,6 +147,11 @@ safe(() =>
     handleRequest(req);
   })
 );
+
+// `_resourceType` is Chrome's own HAR extension field — not in @types/chrome.
+interface RequestWithResourceType {
+  _resourceType?: string;
+}
 
 function handleRequest(req: chrome.devtools.network.Request): void {
   const url = req.request.url;
@@ -134,6 +167,11 @@ function handleRequest(req: chrome.devtools.network.Request): void {
   } catch {
     /* leave as-is */
   }
+  const resourceType = classifyResourceType({
+    harResourceType: (req as RequestWithResourceType)._resourceType,
+    mimeType: req.response.content?.mimeType,
+    url,
+  });
   const base = {
     id: newId('cap'),
     ts: Date.now(),
@@ -149,7 +187,11 @@ function handleRequest(req: chrome.devtools.network.Request): void {
     requestContentType: findHeader(requestHeaders, 'content-type'),
     responseHeaders,
     responseContentType: req.response.content?.mimeType ?? '',
+    resourceType,
   };
+  // Every exclusion kind can be decided from the request line, headers and
+  // status, so bail out before paying for getContent() on unwanted traffic.
+  if (!shouldCapture({ ...base, responseBody: null, responseEncoding: 'utf8' }, filters)) return;
   try {
     req.getContent((content, encoding) => {
       appendEntry({

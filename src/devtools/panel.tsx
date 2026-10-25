@@ -42,7 +42,11 @@ function App(): JSX.Element {
   const [editingCookieProfile, setEditingCookieProfile] = useState<CookieProfile | null>(null);
   const [captureFilter, setCaptureFilter] = useState('');
   const [recording, setRecording] = useState(true);
-  const capture = useCapture({ hostFilter: captureFilter, recording });
+  const capture = useCapture({
+    hostFilter: captureFilter,
+    recording,
+    filters: prefs.captureFilters,
+  });
 
   useEffect(() => {
     applyFontSizeVar(document.documentElement, fontSizePx);
@@ -315,6 +319,7 @@ function App(): JSX.Element {
             recording={recording}
             setRecording={setRecording}
             entries={capture.entries}
+            totalCaptured={capture.totalCaptured}
             clear={capture.clear}
             importFromNetworkLog={capture.importFromNetworkLog}
             reloadInspectedPage={capture.reloadInspectedPage}

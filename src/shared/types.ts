@@ -147,13 +147,14 @@ export type ImportStrategy = 'replace' | 'merge-by-id' | 'append-as-new';
 
 export type FontSizeMode = 'small' | 'normal' | 'big' | 'custom';
 
-export type CaptureColumn = 'time' | 'method' | 'status' | 'path' | 'size' | 'duration';
+export type CaptureColumn = 'time' | 'method' | 'status' | 'path' | 'type' | 'size' | 'duration';
 
 export const CAPTURE_COLUMN_ORDER: readonly CaptureColumn[] = [
   'time',
   'method',
   'status',
   'path',
+  'type',
   'size',
   'duration',
 ];
@@ -163,8 +164,202 @@ export const CAPTURE_COLUMN_LABELS: Record<CaptureColumn, string> = {
   method: 'Method',
   status: 'Status',
   path: 'Path',
+  type: 'Type',
   size: 'Size',
   duration: 'Duration',
+};
+
+// ─── Capture filtering ───────────────────────────────────────────────────────
+
+// DevTools Network-panel style resource buckets. Mirrors the filter chips
+// Chrome itself shows (Fetch/XHR, Doc, CSS, …) so the mental model carries over.
+export type CaptureResourceType =
+  'xhr' | 'doc' | 'css' | 'js' | 'font' | 'img' | 'media' | 'manifest' | 'ws' | 'wasm' | 'other';
+
+export const CAPTURE_RESOURCE_TYPE_ORDER: readonly CaptureResourceType[] = [
+  'xhr',
+  'doc',
+  'css',
+  'js',
+  'font',
+  'img',
+  'media',
+  'manifest',
+  'ws',
+  'wasm',
+  'other',
+];
+
+export const CAPTURE_RESOURCE_TYPE_LABELS: Record<CaptureResourceType, string> = {
+  xhr: 'Fetch/XHR',
+  doc: 'Doc',
+  css: 'CSS',
+  js: 'JS',
+  font: 'Font',
+  img: 'Img',
+  media: 'Media',
+  manifest: 'Manifest',
+  ws: 'WS',
+  wasm: 'Wasm',
+  other: 'Other',
+};
+
+// Everything on by default so enabling the feature doesn't silently drop
+// traffic people were already capturing.
+export const DEFAULT_CAPTURE_TYPES: Record<CaptureResourceType, boolean> = {
+  xhr: true,
+  doc: true,
+  css: true,
+  js: true,
+  font: true,
+  img: true,
+  media: true,
+  manifest: true,
+  ws: true,
+  wasm: true,
+  other: true,
+};
+
+export type CaptureExcludeKind =
+  'domain' | 'path' | 'contains' | 'regex' | 'extension' | 'method' | 'status';
+
+export const CAPTURE_EXCLUDE_KIND_ORDER: readonly CaptureExcludeKind[] = [
+  'domain',
+  'path',
+  'contains',
+  'regex',
+  'extension',
+  'method',
+  'status',
+];
+
+export const CAPTURE_EXCLUDE_KIND_LABELS: Record<CaptureExcludeKind, string> = {
+  domain: 'Domain is / ends with',
+  path: 'Path starts with',
+  contains: 'URL contains',
+  regex: 'URL matches regex',
+  extension: 'File extension',
+  method: 'Method is',
+  status: 'Status code',
+};
+
+export const CAPTURE_EXCLUDE_KIND_PLACEHOLDERS: Record<CaptureExcludeKind, string> = {
+  domain: 'google-analytics.com',
+  path: '/static/',
+  contains: 'sockjs-node',
+  regex: '\\.(png|jpe?g|svg)(\\?|$)',
+  extension: 'woff2',
+  method: 'OPTIONS',
+  status: '204 or 3xx',
+};
+
+export interface CaptureExcludeRule {
+  id: string;
+  kind: CaptureExcludeKind;
+  value: string;
+  enabled: boolean;
+}
+
+// Which parts of a request make it "the same request" as an earlier one.
+// url+method alone means a repeated poll is captured once; adding requestBody
+// keeps two POSTs to the same endpoint with different payloads.
+export interface CaptureUniqueConfig {
+  enabled: boolean;
+  byUrl: boolean;
+  byMethod: boolean;
+  byRequestBody: boolean;
+  byResponseBody: boolean;
+}
+
+export const DEFAULT_CAPTURE_UNIQUE: CaptureUniqueConfig = {
+  enabled: false,
+  byUrl: true,
+  byMethod: true,
+  byRequestBody: false,
+  byResponseBody: false,
+};
+
+export interface CaptureFilters {
+  excludes: CaptureExcludeRule[];
+  types: Record<CaptureResourceType, boolean>;
+  unique: CaptureUniqueConfig;
+  // CORS preflights: same URL as the call that follows, no body, nothing to
+  // mock. Shortcut for the equivalent `method is OPTIONS` exclusion.
+  ignoreOptions: boolean;
+}
+
+export const DEFAULT_CAPTURE_FILTERS: CaptureFilters = {
+  excludes: [],
+  types: { ...DEFAULT_CAPTURE_TYPES },
+  unique: { ...DEFAULT_CAPTURE_UNIQUE },
+  ignoreOptions: false,
+};
+
+// ─── Capture export ──────────────────────────────────────────────────────────
+
+export type CaptureExportField =
+  | 'timestamp'
+  | 'status'
+  | 'duration'
+  | 'size'
+  | 'resourceType'
+  | 'curl'
+  | 'requestHeaders'
+  | 'requestBody'
+  | 'responseHeaders'
+  | 'responseBody';
+
+export const CAPTURE_EXPORT_FIELD_ORDER: readonly CaptureExportField[] = [
+  'timestamp',
+  'status',
+  'duration',
+  'size',
+  'resourceType',
+  'curl',
+  'requestHeaders',
+  'requestBody',
+  'responseHeaders',
+  'responseBody',
+];
+
+export const CAPTURE_EXPORT_FIELD_LABELS: Record<CaptureExportField, string> = {
+  timestamp: 'Timestamp',
+  status: 'Status code',
+  duration: 'Duration',
+  size: 'Response size',
+  resourceType: 'Resource type',
+  curl: 'Request as curl',
+  requestHeaders: 'Request headers (list)',
+  requestBody: 'Request body (raw)',
+  responseHeaders: 'Response headers',
+  responseBody: 'Response body',
+};
+
+// 'files' = one file per request inside a zip, 'single' = one combined
+// markdown file, 'json' = machine-readable array.
+export type CaptureExportFormat = 'files' | 'single' | 'json';
+
+export interface CaptureExportOptions {
+  fields: Record<CaptureExportField, boolean>;
+  format: CaptureExportFormat;
+}
+
+// curl already carries the request headers and body, so those two are off by
+// default to avoid repeating them in every file.
+export const DEFAULT_CAPTURE_EXPORT: CaptureExportOptions = {
+  fields: {
+    timestamp: true,
+    status: true,
+    duration: true,
+    size: true,
+    resourceType: true,
+    curl: true,
+    requestHeaders: false,
+    requestBody: false,
+    responseHeaders: true,
+    responseBody: true,
+  },
+  format: 'files',
 };
 
 export interface UIPreferences {
@@ -172,6 +367,8 @@ export interface UIPreferences {
   fontSizeCustomPx: number;
   showToast: boolean;
   captureColumns: Record<CaptureColumn, boolean>;
+  captureFilters: CaptureFilters;
+  captureExport: CaptureExportOptions;
   autoReloadOnStorageSwitch: boolean;
   // Group ids hidden from the browser-action popup (opt-out, so new groups are
   // visible by default). UI-only preference — does NOT affect whether a group's
@@ -184,6 +381,7 @@ export const DEFAULT_CAPTURE_COLUMNS: Record<CaptureColumn, boolean> = {
   method: true,
   status: true,
   path: true,
+  type: false,
   size: false,
   duration: false,
 };
@@ -193,6 +391,16 @@ export const DEFAULT_UI_PREFERENCES: UIPreferences = {
   fontSizeCustomPx: 14,
   showToast: true,
   captureColumns: { ...DEFAULT_CAPTURE_COLUMNS },
+  captureFilters: {
+    excludes: [],
+    types: { ...DEFAULT_CAPTURE_TYPES },
+    unique: { ...DEFAULT_CAPTURE_UNIQUE },
+    ignoreOptions: false,
+  },
+  captureExport: {
+    fields: { ...DEFAULT_CAPTURE_EXPORT.fields },
+    format: DEFAULT_CAPTURE_EXPORT.format,
+  },
   autoReloadOnStorageSwitch: false,
   hiddenPopupGroupIds: [],
 };

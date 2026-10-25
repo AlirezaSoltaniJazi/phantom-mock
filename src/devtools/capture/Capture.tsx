@@ -2,7 +2,10 @@ import { useEffect, useMemo, useRef, useState, type JSX } from 'react';
 import {
   CAPTURE_COLUMN_LABELS,
   CAPTURE_COLUMN_ORDER,
+  CAPTURE_RESOURCE_TYPE_LABELS,
   type CaptureColumn,
+  type CaptureExportOptions,
+  type CaptureFilters,
   type Group,
   type Rule,
   type UIPreferences,
@@ -10,6 +13,9 @@ import {
 import type { StateMutation } from '@/shared/messages';
 import { bucketByBaseDomain, bucketBySubdomain, urlToParts } from '@/shared/url-parts';
 import { approxBodySize, formatDuration, type CapturedEntry } from './types';
+import { countActiveFilters } from './filters';
+import { FiltersPanel } from './FiltersPanel';
+import { ExportPanel } from './ExportPanel';
 import { PromoteToRule } from './PromoteToRule';
 import type { ImportSummary } from './use-capture';
 
@@ -22,6 +28,7 @@ const COLUMN_WIDTHS: Record<CaptureColumn, string> = {
   method: '56px',
   status: '48px',
   path: 'minmax(0, 1fr)',
+  type: '68px',
   size: '60px',
   duration: '64px',
 };
@@ -35,6 +42,7 @@ interface Props {
   recording: boolean;
   setRecording: (next: boolean) => void;
   entries: CapturedEntry[];
+  totalCaptured: number;
   clear: () => void;
   importFromNetworkLog: () => Promise<ImportSummary>;
   reloadInspectedPage: () => void;
@@ -51,6 +59,7 @@ export function Capture({
   recording,
   setRecording,
   entries,
+  totalCaptured,
   clear,
   importFromNetworkLog,
   reloadInspectedPage,
@@ -59,6 +68,25 @@ export function Capture({
 }: Props): JSX.Element {
   const [selected, setSelected] = useState<CapturedEntry | null>(null);
   const [importInfo, setImportInfo] = useState<string | null>(null);
+  const [panel, setPanel] = useState<'none' | 'filters' | 'export'>('none');
+
+  const activeFilterCount = useMemo(
+    () => countActiveFilters(prefs.captureFilters),
+    [prefs.captureFilters]
+  );
+  const hiddenCount = Math.max(0, totalCaptured - entries.length);
+
+  function setFilters(next: CaptureFilters): void {
+    void setPrefs({ ...prefs, captureFilters: next });
+  }
+
+  function setExportOptions(next: CaptureExportOptions): void {
+    void setPrefs({ ...prefs, captureExport: next });
+  }
+
+  function togglePanel(next: 'filters' | 'export'): void {
+    setPanel((current) => (current === next ? 'none' : next));
+  }
 
   function toggleColumn(col: CaptureColumn): void {
     const next = { ...prefs.captureColumns, [col]: !prefs.captureColumns[col] };
@@ -80,7 +108,7 @@ export function Capture({
   async function doImport(): Promise<void> {
     setImportInfo('Importing…');
     try {
-      const { total, matched } = await importFromNetworkLog();
+      const { total, matched, filtered } = await importFromNetworkLog();
       if (total === 0) {
         setImportInfo(
           'The Network panel reported 0 requests in its HAR log. Open the Network tab in DevTools and reload the page once with "Preserve log" on, then try again.'
@@ -89,9 +117,13 @@ export function Capture({
         setImportInfo(
           `Found ${total} request${total === 1 ? '' : 's'} in the Network log but none matched the host filter "${hostFilter || '(empty)'}". Adjust the filter and retry.`
         );
+      } else if (filtered === 0) {
+        setImportInfo(
+          `All ${matched} host-matched request${matched === 1 ? '' : 's'} were dropped by the capture filters. Loosen the exclusions or resource types and retry.`
+        );
       } else {
         setImportInfo(
-          `Imported ${matched} of ${total} request${total === 1 ? '' : 's'} from the Network panel log.`
+          `Imported ${filtered} of ${total} request${total === 1 ? '' : 's'} from the Network panel log${filtered < matched ? ` (${matched - filtered} dropped by filters)` : ''}.`
         );
       }
     } catch (err) {
@@ -125,9 +157,39 @@ export function Capture({
         <button type="button" className="pm-btn secondary" onClick={clear}>
           Clear
         </button>
+        <button
+          type="button"
+          className={`pm-btn secondary ${panel === 'filters' ? 'is-active' : ''}`}
+          onClick={() => togglePanel('filters')}
+          aria-expanded={panel === 'filters'}
+        >
+          Filters{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''} ▾
+        </button>
+        <button
+          type="button"
+          className={`pm-btn secondary ${panel === 'export' ? 'is-active' : ''}`}
+          onClick={() => togglePanel('export')}
+          aria-expanded={panel === 'export'}
+        >
+          Export ▾
+        </button>
         <ColumnsMenu columns={prefs.captureColumns} onToggle={toggleColumn} />
-        <span style={{ color: 'var(--fg-muted)', marginLeft: 4 }}>{entries.length} captured</span>
+        <span style={{ color: 'var(--fg-muted)', marginLeft: 4 }}>
+          {entries.length} shown{hiddenCount > 0 ? ` · ${hiddenCount} filtered out` : ''}
+        </span>
       </div>
+
+      {panel === 'filters' ? (
+        <FiltersPanel filters={prefs.captureFilters} onChange={setFilters} />
+      ) : null}
+      {panel === 'export' ? (
+        <ExportPanel
+          entries={entries}
+          selected={selected}
+          options={prefs.captureExport}
+          onChange={setExportOptions}
+        />
+      ) : null}
 
       {importInfo ? (
         <div style={{ color: 'var(--fg-muted)', fontSize: 'calc(var(--pm-font-size) - 1px)' }}>
@@ -246,6 +308,10 @@ function CaptureCell({ col, entry }: { col: CaptureColumn; entry: CapturedEntry 
         <span className="pm-cap-path" title={entry.path}>
           {entry.path || '/'}
         </span>
+      );
+    case 'type':
+      return (
+        <span className="pm-cap-type">{CAPTURE_RESOURCE_TYPE_LABELS[entry.resourceType]}</span>
       );
     case 'size':
       return <span className="pm-cap-size">{approxBodySize(entry.responseBody)}</span>;

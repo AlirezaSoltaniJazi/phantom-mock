@@ -90,7 +90,7 @@ Typed message protocol for Chrome runtime messaging. Twelve message types: `GET_
 | `src/injected/`            | MAIN-world page injection — fetch/XHR patching                                                                              |
 | `src/devtools/`            | DevTools panel React app — rule editing, hit log, capture                                                                   |
 | `src/devtools/components/` | UI components — RuleEditor, RulesTable, GroupsTable, Storage/Cookies tabs & editors, HitLog, DnrDebug, Settings, JSON views |
-| `src/devtools/capture/`    | Network capture tab — recording, HAR import, promote-to-rule                                                                |
+| `src/devtools/capture/`    | Network capture tab — recording, filtering, HAR import, export, promote-to-rule                                             |
 | `src/popup/`               | Browser-action popup — master toggle, domain-grouped rule counts                                                            |
 | `src/shared/`              | Cross-context types, messages, matcher, constants, preferences                                                              |
 | `src/utils/`               | Pure utilities — ID generation, string hashing                                                                              |
