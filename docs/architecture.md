@@ -69,6 +69,8 @@ Fifteen mutation types (`upsertGroup`, `deleteGroup`, `toggleGroup`, `reorderGro
 
 Typed message protocol for Chrome runtime messaging. Twelve message types: `GET_STATE`, `MUTATE_STATE`, `RULES_UPDATED`, `MOCK_HIT`, `GET_HIT_LOG`, `CLEAR_HIT_LOG`, `GET_DNR_DEBUG`, `TEST_DNR_MATCH`, `CLEAR_DNR_MATCH_LOG`, `COOKIES_GET`, `COOKIES_SET`, `COOKIES_REMOVE`. Defined in `src/shared/messages.ts`.
 
+Content scripts may only send `GET_STATE` (answered with the trimmed `contentScriptState()` view) and `MOCK_HIT` (rebuilt by `sanitizeMockHit()`, since the page can forge hits). Every other message, and the Hit Log / DNR match-log ports, is restricted to extension pages by `isPrivilegedSender()` in `src/background/senders.ts`.
+
 ### Rule Matcher
 
 `specMatches()`, `isRuleActive()`, and `findFirstMockMatch()` in `src/shared/matcher.ts`. Used by both the page-world script (client-side interception) and the DNR translator (network-layer rules). First-match-wins ordering.

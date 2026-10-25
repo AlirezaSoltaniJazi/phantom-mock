@@ -2,7 +2,7 @@
 
 ## Prerequisites
 
-- Node.js 20+ (CI tests on Node 20 and 22)
+- Node.js 22.12+ (CI tests on Node 22 and 24)
 - npm (ships with Node)
 - Chrome or Chromium-based browser (for loading the extension)
 

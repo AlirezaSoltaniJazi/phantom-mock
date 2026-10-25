@@ -69,6 +69,25 @@ export function isGroupActive(group: Group, pageUrl: string): boolean {
   return pageUrl.includes(needle);
 }
 
+// Content scripts post their state into the page world, where any script on
+// the page can read it. Hand them only what page-world mocking needs — active
+// mock rules and their groups — never header rules (often credentials),
+// storage/cookie profiles, or anything at all while the master switch is off.
+export function contentScriptState(state: AppState): AppState {
+  const view = buildActiveView(state);
+  const rules = state.rules.filter(
+    (rule) => rule.action.kind === 'mock' && isRuleActive(rule, view, state.masterEnabled)
+  );
+  const groupIds = new Set(rules.map((rule) => rule.groupId));
+  return {
+    ...state,
+    groups: state.groups.filter((group) => groupIds.has(group.id)),
+    rules,
+    storageProfiles: [],
+    cookieProfiles: [],
+  };
+}
+
 export function findFirstMockMatch(
   state: AppState,
   url: string,

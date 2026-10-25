@@ -107,10 +107,10 @@ export function classifyResourceType({
   mimeType,
   url,
 }: ClassifyInput): CaptureResourceType {
-  const fromHar = harResourceType
-    ? HAR_RESOURCE_TYPE_MAP[harResourceType.toLowerCase()]
-    : undefined;
-  if (fromHar) return fromHar;
+  const harKey = harResourceType?.toLowerCase();
+  if (harKey && Object.hasOwn(HAR_RESOURCE_TYPE_MAP, harKey)) {
+    return HAR_RESOURCE_TYPE_MAP[harKey] as CaptureResourceType;
+  }
 
   if (url && /^wss?:\/\//i.test(url)) return 'ws';
 
@@ -122,7 +122,8 @@ export function classifyResourceType({
   }
 
   const ext = url ? extensionOf(url) : null;
-  if (ext && EXTENSION_MAP[ext]) return EXTENSION_MAP[ext];
+  // Own keys only — a URL ending in `.constructor` must not hit Object.prototype.
+  if (ext && Object.hasOwn(EXTENSION_MAP, ext)) return EXTENSION_MAP[ext] as CaptureResourceType;
 
   return 'other';
 }
@@ -142,9 +143,11 @@ export function normalizeEntry(entry: CapturedEntry): CapturedEntry {
   };
 }
 
+// Hostname without the port, so excluding `localhost` also covers
+// `localhost:5173` (dev servers, HMR sockets).
 function hostOf(url: string): string {
   try {
-    return new URL(url).host.toLowerCase();
+    return new URL(url).hostname.toLowerCase();
   } catch {
     return '';
   }
@@ -159,15 +162,24 @@ function pathOf(url: string): string {
   }
 }
 
+function statusPartMatches(status: number, part: string): boolean {
+  if (/^\d{1,3}$/.test(part)) return status === Number(part);
+  if (/^\dxx$/.test(part)) return Math.floor(status / 100) === Number(part[0]);
+  const range = /^(\d{1,3})-(\d{1,3})$/.exec(part);
+  if (!range) return false;
+  const a = Number(range[1]);
+  const b = Number(range[2]);
+  return status >= Math.min(a, b) && status <= Math.max(a, b);
+}
+
+// Supports exact codes ("404", "0" for failed requests), class wildcards
+// ("4xx"), ranges ("500-599") and comma/space separated lists ("204, 3xx").
 function statusMatches(status: number, pattern: string): boolean {
-  const trimmed = pattern.trim().toLowerCase();
-  if (!trimmed) return false;
-  // Supports exact codes ("404"), class wildcards ("4xx") and ranges ("500-599").
-  if (/^\d{3}$/.test(trimmed)) return status === Number(trimmed);
-  if (/^\dxx$/.test(trimmed)) return Math.floor(status / 100) === Number(trimmed[0]);
-  const range = /^(\d{3})\s*-\s*(\d{3})$/.exec(trimmed);
-  if (range) return status >= Number(range[1]) && status <= Number(range[2]);
-  return false;
+  return pattern
+    .toLowerCase()
+    .replace(/\s*-\s*/g, '-')
+    .split(/[\s,]+/)
+    .some((part) => part !== '' && statusPartMatches(status, part));
 }
 
 export function matchesExclude(entry: CapturedEntry, rule: CaptureExcludeRule): boolean {
@@ -177,7 +189,7 @@ export function matchesExclude(entry: CapturedEntry, rule: CaptureExcludeRule): 
 
   switch (rule.kind) {
     case 'domain': {
-      const host = hostOf(entry.url) || entry.host.toLowerCase();
+      const host = hostOf(entry.url) || entry.host.toLowerCase().replace(/:\d+$/, '');
       const bare = needle.replace(/^\./, '');
       return host === bare || host.endsWith(`.${bare}`);
     }

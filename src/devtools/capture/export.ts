@@ -9,6 +9,40 @@ import { formatBytes, formatDuration, responseSizeBytes, type CapturedEntry } fr
 // Headers Chrome reports but curl either rejects or sets itself.
 const CURL_SKIPPED_HEADERS = new Set(['content-length', 'host', 'connection']);
 
+const SECRET_HEADERS = new Set([
+  'authorization',
+  'proxy-authorization',
+  'cookie',
+  'set-cookie',
+  'x-api-key',
+  'api-key',
+]);
+const SECRET_HEADER_PATTERN = /token|secret|api[-_]?key|session|csrf|xsrf/i;
+export const REDACTED = '[redacted]';
+
+export function isSecretHeader(name: string): boolean {
+  const lower = name.toLowerCase();
+  return SECRET_HEADERS.has(lower) || SECRET_HEADER_PATTERN.test(lower);
+}
+
+type HeaderList = CapturedEntry['requestHeaders'];
+
+function redactHeaders(headers: HeaderList): HeaderList {
+  return headers.map((h) => (isSecretHeader(h.name) ? { ...h, value: REDACTED } : h));
+}
+
+export function redactSecrets(entry: CapturedEntry): CapturedEntry {
+  return {
+    ...entry,
+    requestHeaders: redactHeaders(entry.requestHeaders),
+    responseHeaders: redactHeaders(entry.responseHeaders),
+  };
+}
+
+function prepare(entry: CapturedEntry, options: CaptureExportOptions): CapturedEntry {
+  return options.includeSecrets ? entry : redactSecrets(entry);
+}
+
 function shellQuote(value: string): string {
   return `'${value.replace(/'/g, `'\\''`)}'`;
 }
@@ -16,7 +50,9 @@ function shellQuote(value: string): string {
 export function buildCurl(entry: CapturedEntry): string {
   const lines: string[] = [`curl ${shellQuote(entry.url)}`];
   const method = entry.method.toUpperCase();
-  if (method !== 'GET') lines.push(`  -X ${method}`);
+  // Quote the method too: HTTP token syntax allows ` $ | & — a page can send
+  // fetch(url, { method: 'A`cmd`' }) and plant a command in the pasted curl.
+  if (method !== 'GET') lines.push(`  -X ${shellQuote(method)}`);
   for (const header of entry.requestHeaders) {
     // HTTP/2 pseudo-headers (:method, :path, …) aren't real headers.
     if (header.name.startsWith(':')) continue;
@@ -34,8 +70,9 @@ function headerBlock(headers: ReadonlyArray<{ name: string; value: string }>): s
 }
 
 function fence(body: string, lang: string): string {
-  // A body containing ``` would break a 3-backtick fence, so widen it.
-  const longest = /`{3,}/.exec(body)?.[0]?.length ?? 0;
+  // A body containing ``` would break a 3-backtick fence, so widen it past
+  // the longest run in the body.
+  const longest = Math.max(0, ...Array.from(body.matchAll(/`{3,}/g), (m) => m[0].length));
   const ticks = '`'.repeat(Math.max(3, longest + 1));
   return `${ticks}${lang}\n${body}\n${ticks}`;
 }
@@ -63,7 +100,8 @@ function has(options: CaptureExportOptions, field: CaptureExportField): boolean 
   return options.fields[field];
 }
 
-export function buildEntryDocument(entry: CapturedEntry, options: CaptureExportOptions): string {
+export function buildEntryDocument(raw: CapturedEntry, options: CaptureExportOptions): string {
+  const entry = prepare(raw, options);
   const out: string[] = [`# ${entry.method.toUpperCase()} ${entry.path || '/'}`, ''];
 
   const meta: string[] = [`- URL: ${entry.url}`];
@@ -124,7 +162,8 @@ export function buildCombinedDocument(
 }
 
 export function buildJsonDocument(entries: CapturedEntry[], options: CaptureExportOptions): string {
-  const payload = entries.map((entry) => {
+  const payload = entries.map((raw) => {
+    const entry = prepare(raw, options);
     const record: Record<string, unknown> = {
       method: entry.method,
       url: entry.url,

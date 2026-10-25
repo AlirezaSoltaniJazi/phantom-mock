@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Capture can now filter traffic by resource type, drop noise with exclusion
+  rules (domain, path, text, regex, extension, method, status), and hide
+  duplicate requests.
+- Captured requests can be exported as one Markdown file, a zip with one file
+  per request, or JSON.
+
+### Security
+
+- Web pages can no longer read your mock rules. Only rules that are switched
+  on are shared with the page, and nothing at all while Phantom Mock is off.
+  Header rules, storage profiles and cookie profiles are never shared.
+- A web page can no longer add fake entries to the Hit Log or crash it.
+- Capture exports now hide credentials (Authorization, Cookie, Set-Cookie,
+  API keys, tokens) unless you choose to include them.
+- Exported curl commands are now always safe to paste into a terminal.
+
+### Fixed
+
+- Exclusions are saved when you finish typing (Enter or click away), so a
+  half-typed value no longer throws away live traffic.
+- Domain exclusions now also match addresses with a port, such as
+  `localhost:5173`.
+- Status exclusions accept lists (`204, 304`), `0` for failed requests, and
+  ranges written either way round.
+
+### Changed
+
+- Updated the build, test, and CI tooling to their latest versions.
+
 ## [1.0.0] - 2026-09-19
 
 ### Fixed

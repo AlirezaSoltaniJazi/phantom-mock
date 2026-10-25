@@ -38,7 +38,7 @@ sequenceDiagram
 3. **Service worker**: `background/service-worker.ts` — `applyMutation()` processes the mutation (upsertRule, deleteRule, toggleRule, etc.) and calls `updateState()`
 4. **Storage**: `background/storage.ts::setState()` — writes to `chrome.storage.local`, triggers `onChanged` listener
 5. **DNR sync**: `background/rules-dnr.ts::syncDnrRules()` — translates header-type rules to DNR format, calls `chrome.declarativeNetRequest.updateDynamicRules()`
-6. **Broadcast**: `background/service-worker.ts::broadcastRulesUpdated()` — sends `RULES_UPDATED` to all tabs via `chrome.tabs.sendMessage()`
+6. **Broadcast**: `background/service-worker.ts::broadcastRulesUpdated()` — sends `RULES_UPDATED` to all tabs via `chrome.tabs.sendMessage()`. The state is first trimmed by `shared/matcher.ts::contentScriptState()` to active mock rules and their groups (empty while the master switch is off), because everything the content script receives ends up readable by the page
 7. **Content script**: `content/index.ts` — receives `RULES_UPDATED`, calls `postRulesToPage()` which sends rules via `window.postMessage()`
 8. **Page world**: `injected/page-mock.ts` — receives message, updates in-memory `cache` with new rules/groups/masterEnabled
 

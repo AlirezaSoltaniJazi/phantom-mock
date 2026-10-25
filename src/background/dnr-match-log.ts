@@ -2,6 +2,7 @@ import { MAX_DNR_MATCH_ENTRIES, PORT_NAMES } from '@/shared/constants';
 import type { DnrMatchEntry } from '@/shared/types';
 import { getState } from './storage';
 import { ruleIdFor } from './rules-dnr';
+import { isPrivilegedSender } from './senders';
 
 const buffer: DnrMatchEntry[] = [];
 const subscribers = new Set<chrome.runtime.Port>();
@@ -38,6 +39,11 @@ export function clearDnrMatches(): void {
 export function registerDnrMatchPortListener(): void {
   chrome.runtime.onConnect.addListener((port) => {
     if (port.name !== PORT_NAMES.DNR_MATCH_LOG) return;
+    // Request URLs from every tab flow through here — extension pages only.
+    if (!isPrivilegedSender(port.sender)) {
+      port.disconnect();
+      return;
+    }
     subscribers.add(port);
     port.postMessage({ kind: 'snapshot', entries: getDnrMatches() });
     port.onDisconnect.addListener(() => {

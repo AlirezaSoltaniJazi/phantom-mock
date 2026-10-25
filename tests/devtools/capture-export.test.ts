@@ -6,6 +6,8 @@ import {
   buildExport,
   buildJsonDocument,
   fileNameFor,
+  isSecretHeader,
+  REDACTED,
 } from '@/devtools/capture/export';
 import { DEFAULT_CAPTURE_EXPORT, type CaptureExportOptions } from '@/shared/types';
 import type { CapturedEntry } from '@/devtools/capture/types';
@@ -42,6 +44,7 @@ function options(overrides: Partial<CaptureExportOptions> = {}): CaptureExportOp
   return {
     fields: { ...DEFAULT_CAPTURE_EXPORT.fields },
     format: DEFAULT_CAPTURE_EXPORT.format,
+    includeSecrets: DEFAULT_CAPTURE_EXPORT.includeSecrets,
     ...overrides,
   };
 }
@@ -50,9 +53,14 @@ describe('buildCurl', () => {
   it('emits the url, method, headers and body', () => {
     const curl = buildCurl(makeEntry());
     expect(curl).toContain("curl 'https://api.example.com/v1/users?page=2'");
-    expect(curl).toContain('-X POST');
+    expect(curl).toContain("-X 'POST'");
     expect(curl).toContain("-H 'content-type: application/json'");
     expect(curl).toContain('--data-raw \'{"name":"ada"}\'');
+  });
+
+  it('quotes the method so a hostile one cannot inject shell commands', () => {
+    const curl = buildCurl(makeEntry({ method: 'A`id`$(id)' }));
+    expect(curl).toContain("-X 'A`ID`$(ID)'");
   });
 
   it('omits -X for GET', () => {
@@ -121,6 +129,34 @@ describe('buildEntryDocument', () => {
     expect(doc).toContain('````');
   });
 
+  it('fences past the longest backtick run, not the first', () => {
+    const body = '```\nshort\n```\n`````\nlong\n`````';
+    const doc = buildEntryDocument(
+      makeEntry({ responseBody: body, responseContentType: 'text/plain' }),
+      options()
+    );
+    expect(doc).toContain(`\`\`\`\`\`\`\n${body}\n\`\`\`\`\`\``);
+  });
+
+  it('masks credential headers unless secrets are explicitly included', () => {
+    const entry = makeEntry({
+      responseHeaders: [{ name: 'Set-Cookie', value: 'sid=abc; HttpOnly' }],
+    });
+    const fields = { ...DEFAULT_CAPTURE_EXPORT.fields, requestHeaders: true };
+    const masked = buildEntryDocument(entry, options({ fields }));
+    expect(masked).not.toContain('Bearer tok');
+    expect(masked).not.toContain('sid=abc');
+    expect(masked).toContain(`authorization: ${REDACTED}`);
+    expect(masked).toContain(`Set-Cookie: ${REDACTED}`);
+
+    const json = buildJsonDocument([entry], options({ fields }));
+    expect(json).not.toContain('Bearer tok');
+
+    const raw = buildEntryDocument(entry, options({ fields, includeSecrets: true }));
+    expect(raw).toContain('Bearer tok');
+    expect(raw).toContain('sid=abc');
+  });
+
   it('says so when no body was captured', () => {
     const doc = buildEntryDocument(makeEntry({ responseBody: null }), options());
     expect(doc).toContain('(no body captured)');
@@ -183,5 +219,16 @@ describe('buildExport', () => {
     const text = new TextDecoder().decode(await zip.blob.arrayBuffer());
     expect(text).toContain('001-POST-api-example-com-v1-users-page-2.md');
     expect(text).toContain('002-POST-api-example-com-v1-users-page-2.md');
+  });
+});
+
+describe('isSecretHeader', () => {
+  it('flags credential headers by name and pattern', () => {
+    for (const name of ['Authorization', 'cookie', 'X-API-Key', 'x-auth-token', 'X-CSRF-Token']) {
+      expect(isSecretHeader(name)).toBe(true);
+    }
+    for (const name of ['content-type', 'accept', 'cache-control']) {
+      expect(isSecretHeader(name)).toBe(false);
+    }
   });
 });

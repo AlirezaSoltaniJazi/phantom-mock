@@ -52,15 +52,25 @@ export function approxBodySize(body: string | null): string {
   return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
 }
 
+// The marker devtools.ts appends when it cuts an oversized body.
+const TRUNCATED_BODY = /\n…\[truncated, original (\d+) chars\]$/;
+
 export function responseSizeBytes(entry: CapturedEntry): number {
-  if (entry.responseBody) {
-    return entry.responseEncoding === 'base64'
-      ? Math.floor((entry.responseBody.length * 3) / 4)
-      : new Blob([entry.responseBody]).size;
+  const body = entry.responseBody;
+  if (body && !TRUNCATED_BODY.test(body)) {
+    if (entry.responseEncoding !== 'base64') return new Blob([body]).size;
+    const padding = body.endsWith('==') ? 2 : body.endsWith('=') ? 1 : 0;
+    return Math.floor((body.length * 3) / 4) - padding;
   }
+  // No body, or only a truncated copy: prefer the server's declared length,
+  // then the original length recorded in the truncation marker.
   const header = entry.responseHeaders.find((h) => h.name.toLowerCase() === 'content-length');
   const parsed = header ? Number.parseInt(header.value, 10) : Number.NaN;
-  return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
+  if (Number.isFinite(parsed) && parsed >= 0) return parsed;
+  const original = body ? TRUNCATED_BODY.exec(body)?.[1] : undefined;
+  if (!original) return 0;
+  const chars = Number(original);
+  return entry.responseEncoding === 'base64' ? Math.floor((chars * 3) / 4) : chars;
 }
 
 export function formatBytes(bytes: number): string {

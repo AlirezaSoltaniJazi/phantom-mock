@@ -75,6 +75,9 @@ export function Capture({
     [prefs.captureFilters]
   );
   const hiddenCount = Math.max(0, totalCaptured - entries.length);
+  // The open request may since have been hidden by a filter; export only what
+  // the user can still see.
+  const visibleSelected = selected && entries.some((e) => e.id === selected.id) ? selected : null;
 
   function setFilters(next: CaptureFilters): void {
     void setPrefs({ ...prefs, captureFilters: next });
@@ -185,7 +188,7 @@ export function Capture({
       {panel === 'export' ? (
         <ExportPanel
           entries={entries}
-          selected={selected}
+          selected={visibleSelected}
           options={prefs.captureExport}
           onChange={setExportOptions}
         />

@@ -99,6 +99,14 @@ describe('classifyResourceType', () => {
   });
 });
 
+describe('classifyResourceType — inherited keys', () => {
+  it('ignores Object.prototype names in the HAR type and file extension', () => {
+    expect(classifyResourceType({ url: 'https://x.test/a.constructor' })).toBe('other');
+    expect(classifyResourceType({ url: 'https://x.test/a.__proto__' })).toBe('other');
+    expect(classifyResourceType({ harResourceType: 'toString' })).toBe('other');
+  });
+});
+
 describe('extensionOf', () => {
   it('ignores query strings and dotfiles', () => {
     expect(extensionOf('/a/b/c.png?x=1#y')).toBe('png');
@@ -172,6 +180,23 @@ describe('matchesExclude', () => {
     expect(matchesExclude(e304, exclude({ kind: 'status', value: '300-310' }))).toBe(true);
     expect(matchesExclude(e304, exclude({ kind: 'status', value: '4xx' }))).toBe(false);
     expect(matchesExclude(e304, exclude({ kind: 'status', value: 'nonsense' }))).toBe(false);
+  });
+
+  it('matches status lists, failed requests (0) and reversed ranges', () => {
+    const e304 = makeEntry({ status: 304 });
+    expect(matchesExclude(e304, exclude({ kind: 'status', value: '204, 304' }))).toBe(true);
+    expect(matchesExclude(e304, exclude({ kind: 'status', value: '204 3xx' }))).toBe(true);
+    expect(matchesExclude(e304, exclude({ kind: 'status', value: '310 - 300' }))).toBe(true);
+    expect(matchesExclude(e304, exclude({ kind: 'status', value: '204, 4xx' }))).toBe(false);
+    const failed = makeEntry({ status: 0 });
+    expect(matchesExclude(failed, exclude({ kind: 'status', value: '0' }))).toBe(true);
+  });
+
+  it('matches a domain regardless of the port', () => {
+    const hmr = makeEntry({ url: 'http://localhost:5173/@vite/client' });
+    expect(matchesExclude(hmr, exclude({ kind: 'domain', value: 'localhost' }))).toBe(true);
+    const sub = makeEntry({ url: 'https://cdn.example.com:8443/app.js' });
+    expect(matchesExclude(sub, exclude({ kind: 'domain', value: 'example.com' }))).toBe(true);
   });
 
   it('never matches on an empty value', () => {

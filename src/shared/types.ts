@@ -342,6 +342,9 @@ export type CaptureExportFormat = 'files' | 'single' | 'json';
 export interface CaptureExportOptions {
   fields: Record<CaptureExportField, boolean>;
   format: CaptureExportFormat;
+  // Off by default: credential headers (Authorization, Cookie, Set-Cookie, API
+  // keys) are masked so an export can be pasted into a ticket or chat safely.
+  includeSecrets: boolean;
 }
 
 // curl already carries the request headers and body, so those two are off by
@@ -360,6 +363,7 @@ export const DEFAULT_CAPTURE_EXPORT: CaptureExportOptions = {
     responseBody: true,
   },
   format: 'files',
+  includeSecrets: false,
 };
 
 export interface UIPreferences {
@@ -400,6 +404,7 @@ export const DEFAULT_UI_PREFERENCES: UIPreferences = {
   captureExport: {
     fields: { ...DEFAULT_CAPTURE_EXPORT.fields },
     format: DEFAULT_CAPTURE_EXPORT.format,
+    includeSecrets: DEFAULT_CAPTURE_EXPORT.includeSecrets,
   },
   autoReloadOnStorageSwitch: false,
   hiddenPopupGroupIds: [],

@@ -26,7 +26,10 @@ export function ExportPanel({ entries, selected, options, onChange }: Props): JS
   const [scope, setScope] = useState<'visible' | 'selected'>('visible');
   const [status, setStatus] = useState<string | null>(null);
 
-  const targets = scope === 'selected' && selected ? [selected] : entries;
+  // Fall back to "visible" when the selection disappears (cleared, filtered
+  // out) so the checked radio always matches what will be exported.
+  const effectiveScope = selected ? scope : 'visible';
+  const targets = effectiveScope === 'selected' && selected ? [selected] : entries;
 
   function toggleField(field: CaptureExportField): void {
     onChange({ ...options, fields: { ...options.fields, [field]: !options.fields[field] } });
@@ -69,6 +72,19 @@ export function ExportPanel({ entries, selected, options, onChange }: Props): JS
             </label>
           ))}
         </div>
+        <label className="pm-checkbox">
+          <input
+            type="checkbox"
+            checked={options.includeSecrets}
+            onChange={() => onChange({ ...options, includeSecrets: !options.includeSecrets })}
+          />
+          Include credentials (Authorization, Cookie, Set-Cookie, tokens)
+        </label>
+        {options.includeSecrets ? (
+          <span className="pm-cap-panel-hint">
+            Exports will contain live session tokens — don&apos;t share them.
+          </span>
+        ) : null}
       </section>
 
       <section className="pm-cap-panel-section">
@@ -99,7 +115,7 @@ export function ExportPanel({ entries, selected, options, onChange }: Props): JS
             <input
               type="radio"
               name="pm-export-scope"
-              checked={scope === 'visible'}
+              checked={effectiveScope === 'visible'}
               onChange={() => setScope('visible')}
             />
             All visible ({entries.length})
@@ -109,7 +125,7 @@ export function ExportPanel({ entries, selected, options, onChange }: Props): JS
               type="radio"
               name="pm-export-scope"
               disabled={!selected}
-              checked={scope === 'selected'}
+              checked={effectiveScope === 'selected'}
               onChange={() => setScope('selected')}
             />
             Selected request only

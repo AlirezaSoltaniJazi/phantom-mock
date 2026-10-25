@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isPrivilegedSender, tabIdMatchesSender } from '@/background/service-worker';
+import { isPrivilegedSender, tabIdMatchesSender } from '@/background/senders';
 
 // Trusted extension contexts (popup, options, DevTools panel) report
 // sender.url as chrome-extension://<our-id>/<page>.

@@ -1,4 +1,4 @@
-import type { JSX } from 'react';
+import { useState, type JSX } from 'react';
 import {
   CAPTURE_EXCLUDE_KIND_LABELS,
   CAPTURE_EXCLUDE_KIND_ORDER,
@@ -190,11 +190,12 @@ export function FiltersPanel({ filters, onChange }: Props): JSX.Element {
                     </option>
                   ))}
                 </select>
-                <input
-                  type="text"
+                <ExcludeValueInput
+                  // Remount when the saved value changes elsewhere (reset, sync).
+                  key={rule.value}
                   value={rule.value}
                   placeholder={CAPTURE_EXCLUDE_KIND_PLACEHOLDERS[rule.kind]}
-                  onChange={(e) => updateExclude(rule.id, { value: e.target.value })}
+                  onCommit={(value) => updateExclude(rule.id, { value })}
                 />
                 <button
                   type="button"
@@ -227,5 +228,36 @@ export function FiltersPanel({ filters, onChange }: Props): JSX.Element {
         </button>
       </div>
     </div>
+  );
+}
+
+interface ExcludeValueInputProps {
+  value: string;
+  placeholder: string;
+  onCommit: (value: string) => void;
+}
+
+// Exclusions apply to live capture the moment they're saved, and dropped
+// requests are gone for good. Saving every keystroke would let a half-typed
+// value ("g", "/", "\.") swallow nearly all traffic, so hold a local draft
+// and save on blur or Enter.
+function ExcludeValueInput({ value, placeholder, onCommit }: ExcludeValueInputProps): JSX.Element {
+  const [draft, setDraft] = useState(value);
+
+  function commit(): void {
+    if (draft !== value) onCommit(draft);
+  }
+
+  return (
+    <input
+      type="text"
+      value={draft}
+      placeholder={placeholder}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') commit();
+      }}
+    />
   );
 }

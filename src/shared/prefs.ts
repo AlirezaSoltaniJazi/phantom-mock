@@ -114,6 +114,7 @@ function sanitizeCaptureFilters(value: unknown): CaptureFilters {
 function sanitizeCaptureExport(value: unknown): CaptureExportOptions {
   const fields = { ...DEFAULT_CAPTURE_EXPORT.fields };
   let format: CaptureExportFormat = DEFAULT_CAPTURE_EXPORT.format;
+  let includeSecrets = DEFAULT_CAPTURE_EXPORT.includeSecrets;
   if (typeof value === 'object' && value !== null) {
     const v = value as Partial<CaptureExportOptions>;
     if (typeof v.fields === 'object' && v.fields !== null) {
@@ -125,8 +126,9 @@ function sanitizeCaptureExport(value: unknown): CaptureExportOptions {
     if (EXPORT_FORMATS.has(v.format as CaptureExportFormat)) {
       format = v.format as CaptureExportFormat;
     }
+    if (typeof v.includeSecrets === 'boolean') includeSecrets = v.includeSecrets;
   }
-  return { fields, format };
+  return { fields, format, includeSecrets };
 }
 
 function sanitize(value: unknown): UIPreferences {

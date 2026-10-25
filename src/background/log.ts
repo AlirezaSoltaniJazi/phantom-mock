@@ -1,5 +1,6 @@
 import { MAX_HIT_LOG_ENTRIES, PORT_NAMES } from '@/shared/constants';
 import type { MockHit } from '@/shared/types';
+import { isPrivilegedSender } from './senders';
 
 const buffer: MockHit[] = [];
 const subscribers = new Set<chrome.runtime.Port>();
@@ -36,6 +37,11 @@ export function clearHits(): void {
 export function registerLogPortListener(): void {
   chrome.runtime.onConnect.addListener((port) => {
     if (port.name !== PORT_NAMES.HIT_LOG) return;
+    // Request URLs from every tab flow through here — extension pages only.
+    if (!isPrivilegedSender(port.sender)) {
+      port.disconnect();
+      return;
+    }
     subscribers.add(port);
     port.postMessage({ kind: 'snapshot', hits: getHits() });
     port.onDisconnect.addListener(() => {

@@ -9,12 +9,6 @@ let stack: HTMLDivElement | null = null;
 function ensureHost(): ShadowRoot | null {
   if (shadowRoot) return shadowRoot;
   if (!document.body) return null;
-  const existing = document.getElementById(HOST_ID);
-  if (existing && existing.shadowRoot) {
-    shadowRoot = existing.shadowRoot;
-    stack = shadowRoot.querySelector<HTMLDivElement>('.pm-toast-stack');
-    return shadowRoot;
-  }
   const host = document.createElement('div');
   host.id = HOST_ID;
   host.style.cssText =
