@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildActiveView,
+  contentScriptState,
   findFirstMockMatch,
   isGroupActive,
   isRuleActive,
@@ -196,5 +197,49 @@ describe('findFirstMockMatch', () => {
     };
     const state = makeState([headerRule]);
     expect(findFirstMockMatch(state, 'https://api.github.com/users/x', 'GET')).toBeUndefined();
+  });
+});
+
+describe('contentScriptState', () => {
+  const headerRule: Rule = {
+    ...makeMockRule({ id: 'hdr' }),
+    action: {
+      kind: 'header',
+      requestHeaders: [{ op: 'set', name: 'Authorization', value: 'Bearer secret' }],
+      responseHeaders: [],
+    },
+  };
+
+  it('keeps only active mock rules and their groups', () => {
+    const off = makeMockRule({ id: 'off', enabled: false });
+    const other = makeMockRule({ id: 'other', groupId: 'grp_off' });
+    const state: AppState = {
+      ...makeState([makeMockRule(), off, other, headerRule]),
+      groups: [
+        { id: DEFAULT_GROUP_ID, name: 'Default', enabled: true, order: 0 },
+        { id: 'grp_off', name: 'Off', enabled: false, order: 1 },
+      ],
+    };
+    const slim = contentScriptState(state);
+    expect(slim.rules.map((r) => r.id)).toEqual(['rule_1']);
+    expect(slim.groups.map((g) => g.id)).toEqual([DEFAULT_GROUP_ID]);
+    expect(JSON.stringify(slim)).not.toContain('Bearer secret');
+  });
+
+  it('sends nothing while the master switch is off', () => {
+    const slim = contentScriptState(makeState([makeMockRule()], false));
+    expect(slim.rules).toEqual([]);
+    expect(slim.groups).toEqual([]);
+  });
+
+  it('never includes storage or cookie profiles', () => {
+    const state = {
+      ...makeState([makeMockRule()]),
+      storageProfiles: [{ id: 'sprof_1' }],
+      cookieProfiles: [{ id: 'cprof_1' }],
+    } as unknown as AppState;
+    const slim = contentScriptState(state);
+    expect(slim.storageProfiles).toEqual([]);
+    expect(slim.cookieProfiles).toEqual([]);
   });
 });

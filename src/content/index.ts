@@ -1,5 +1,5 @@
 import { MESSAGE_TYPES, PAGE_MESSAGE_SOURCE, PAGE_MESSAGE_TYPES } from '@/shared/constants';
-import { isRuntimeMessage } from '@/shared/messages';
+import { isRuntimeMessage, sanitizeMockHit } from '@/shared/messages';
 import { getPrefs, subscribePrefs } from '@/shared/prefs';
 import type { AppState, MockHit, Rule, UIPreferences } from '@/shared/types';
 import { DEFAULT_UI_PREFERENCES } from '@/shared/types';
@@ -29,6 +29,8 @@ function notifyToasts(hit: MockHit): void {
   }
 }
 
+// `state` is already trimmed by the service worker to active mock rules only
+// (see contentScriptState) — everything posted here is readable by the page.
 function postRulesToPage(state: AppState): void {
   latestState = state;
   const mockRules = state.rules.filter((r): r is Rule => r.action.kind === 'mock');
@@ -71,7 +73,10 @@ window.addEventListener('message', (event: MessageEvent) => {
   const data = event.data as { source?: string; type?: string; payload?: unknown };
   if (!data || data.source !== PAGE_MESSAGE_SOURCE) return;
   if (data.type === PAGE_MESSAGE_TYPES.HIT) {
-    const hit = data.payload as MockHit;
+    // The page can post HITs too — only accept well-formed ones for rules we
+    // actually handed to this page.
+    const hit = sanitizeMockHit(data.payload);
+    if (!hit || !latestState?.rules.some((r) => r.id === hit.ruleId)) return;
     // Synchronously guarded — an orphaned content script (extension reloaded)
     // keeps receiving page-world HITs; an unguarded send throws "Extension
     // context invalidated" that a `.catch()` cannot swallow.

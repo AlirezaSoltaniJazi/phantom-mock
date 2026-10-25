@@ -1,5 +1,10 @@
 import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
-import { connectPort, disconnectPort, isExtensionContextValid } from '@/shared/messages';
+import {
+  connectPort,
+  disconnectPort,
+  isExtensionContextValid,
+  sanitizeMockHit,
+} from '@/shared/messages';
 
 const runtime = chrome.runtime as unknown as { id?: string | undefined; connect: Mock };
 
@@ -62,5 +67,34 @@ describe('disconnectPort', () => {
     const port = { disconnect } as unknown as chrome.runtime.Port;
     disconnectPort(port);
     expect(disconnect).toHaveBeenCalledOnce();
+  });
+});
+
+describe('sanitizeMockHit', () => {
+  const hit = {
+    ruleId: 'rule_1',
+    ruleName: 'Users',
+    url: 'https://api.example.com/users',
+    method: 'GET',
+    statusCode: 200,
+    delayMs: 0,
+    ts: 1,
+  };
+
+  it('accepts a well-formed hit and drops unknown fields', () => {
+    expect(sanitizeMockHit({ ...hit, extra: { evil: true } })).toEqual(hit);
+  });
+
+  it('rejects non-objects and wrongly typed fields', () => {
+    expect(sanitizeMockHit(null)).toBeNull();
+    expect(sanitizeMockHit('hit')).toBeNull();
+    expect(sanitizeMockHit({ ...hit, ruleName: { x: 1 } })).toBeNull();
+    expect(sanitizeMockHit({ ...hit, statusCode: Number.NaN })).toBeNull();
+    expect(sanitizeMockHit({ ...hit, ts: undefined })).toBeNull();
+  });
+
+  it('caps oversized strings', () => {
+    const out = sanitizeMockHit({ ...hit, url: 'x'.repeat(100_000) });
+    expect(out?.url.length).toBe(4096);
   });
 });

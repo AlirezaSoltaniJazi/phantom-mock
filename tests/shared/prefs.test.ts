@@ -47,3 +47,88 @@ describe('getPrefs — hiddenPopupGroupIds sanitization', () => {
     expect(prefs.hiddenPopupGroupIds).toEqual([]);
   });
 });
+
+describe('getPrefs — capture filter sanitization', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('falls back to the capture defaults when the field is missing or junk', async () => {
+    mockStored({ captureFilters: 'nope' });
+    const prefs = await getPrefs();
+    expect(prefs.captureFilters).toEqual(DEFAULT_UI_PREFERENCES.captureFilters);
+  });
+
+  it('keeps only well-formed exclusions and backfills their ids', async () => {
+    mockStored({
+      captureFilters: {
+        excludes: [
+          { id: 'cex_1', kind: 'domain', value: 'ads.com', enabled: false },
+          { kind: 'contains', value: 'sockjs' },
+          { kind: 'nonsense', value: 'x' },
+          { kind: 'domain', value: 42 },
+          'garbage',
+        ],
+      },
+    });
+    const { excludes } = (await getPrefs()).captureFilters;
+    expect(excludes).toHaveLength(2);
+    expect(excludes[0]).toEqual({ id: 'cex_1', kind: 'domain', value: 'ads.com', enabled: false });
+    expect(excludes[1]).toMatchObject({ kind: 'contains', value: 'sockjs', enabled: true });
+    expect(excludes[1]?.id).toBeTruthy();
+  });
+
+  it('merges partial resource-type toggles over the defaults', async () => {
+    mockStored({ captureFilters: { types: { img: false, bogus: false, font: 'no' } } });
+    const { types } = (await getPrefs()).captureFilters;
+    expect(types.img).toBe(false);
+    expect(types.font).toBe(true);
+    expect(types.xhr).toBe(true);
+  });
+
+  it('keeps ignoreOptions as a boolean and defaults it off', async () => {
+    mockStored({ captureFilters: { ignoreOptions: true } });
+    expect((await getPrefs()).captureFilters.ignoreOptions).toBe(true);
+    mockStored({ captureFilters: { ignoreOptions: 'yes' } });
+    expect((await getPrefs()).captureFilters.ignoreOptions).toBe(false);
+  });
+
+  it('forces a usable dedupe key when every part is unticked', async () => {
+    mockStored({
+      captureFilters: {
+        unique: {
+          enabled: true,
+          byUrl: false,
+          byMethod: false,
+          byRequestBody: false,
+          byResponseBody: false,
+        },
+      },
+    });
+    const { unique } = (await getPrefs()).captureFilters;
+    expect(unique.enabled).toBe(true);
+    expect(unique.byUrl).toBe(true);
+  });
+});
+
+describe('getPrefs — capture export sanitization', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('merges known fields and rejects an unknown format', async () => {
+    mockStored({ captureExport: { fields: { responseBody: false, nope: true }, format: 'pdf' } });
+    const { captureExport } = await getPrefs();
+    expect(captureExport.fields.responseBody).toBe(false);
+    expect(captureExport.fields.curl).toBe(true);
+    expect(captureExport).not.toHaveProperty('fields.nope');
+    expect(captureExport.format).toBe('files');
+  });
+
+  it('accepts each supported format', async () => {
+    for (const format of ['files', 'single', 'json'] as const) {
+      mockStored({ captureExport: { format } });
+      expect((await getPrefs()).captureExport.format).toBe(format);
+    }
+  });
+});

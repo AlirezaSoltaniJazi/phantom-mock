@@ -1,21 +1,32 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { STORAGE_KEYS } from '@/shared/constants';
+import type { CaptureFilters } from '@/shared/types';
 import { newId } from '@/utils/id';
 import { reloadInspectedPage as sharedReloadInspectedPage } from '../inspected-window';
+import {
+  applyCaptureFilters,
+  classifyResourceType,
+  shouldCapture,
+  normalizeEntry,
+} from './filters';
 import { matchesHostFilter, type CapturedEntry, type CapturedHeader } from './types';
 
 export interface UseCaptureOptions {
   hostFilter: string;
   recording: boolean;
+  filters: CaptureFilters;
 }
 
 export interface ImportSummary {
   total: number;
   matched: number;
+  filtered: number;
 }
 
 export interface UseCaptureResult {
   entries: CapturedEntry[];
+  /** Everything in the buffer, before host/exclusion/type/unique filtering. */
+  totalCaptured: number;
   clear: () => void;
   importFromNetworkLog: () => Promise<ImportSummary>;
   reloadInspectedPage: () => void;
@@ -36,6 +47,8 @@ function findHeader(headers: CapturedHeader[], name: string): string | null {
 // Plain HAR entry as returned by chrome.devtools.network.getHAR() — no getContent
 // method, body lives at entry.response.content.text.
 interface HarEntryLike {
+  // Chrome's own HAR extension field; absent in third-party HAR files.
+  _resourceType?: string;
   request?: {
     method?: string;
     url?: string;
@@ -86,10 +99,19 @@ function buildEntryFromHar(e: HarEntryLike): CapturedEntry {
     responseBody: typeof content?.text === 'string' ? content.text : null,
     responseContentType: content?.mimeType ?? '',
     responseEncoding: content?.encoding === 'base64' ? 'base64' : 'utf8',
+    resourceType: classifyResourceType({
+      harResourceType: e._resourceType,
+      mimeType: content?.mimeType,
+      url,
+    }),
   };
 }
 
-export function useCapture({ hostFilter, recording }: UseCaptureOptions): UseCaptureResult {
+export function useCapture({
+  hostFilter,
+  recording,
+  filters,
+}: UseCaptureOptions): UseCaptureResult {
   // Single source of truth for captured entries is chrome.storage.session,
   // populated by devtools.ts (which registers the onRequestFinished listener as
   // early as DevTools open). We read it and subscribe to changes.
@@ -102,7 +124,7 @@ export function useCapture({ hostFilter, recording }: UseCaptureOptions): UseCap
       .then((r) => {
         if (!mounted) return;
         const buf = r[STORAGE_KEYS.CAPTURE_BUFFER];
-        if (Array.isArray(buf)) setAllEntries(buf as CapturedEntry[]);
+        if (Array.isArray(buf)) setAllEntries((buf as CapturedEntry[]).map(normalizeEntry));
       })
       .catch(() => undefined);
 
@@ -113,7 +135,7 @@ export function useCapture({ hostFilter, recording }: UseCaptureOptions): UseCap
       if (area !== 'session') return;
       const change = changes[STORAGE_KEYS.CAPTURE_BUFFER];
       if (change && Array.isArray(change.newValue)) {
-        setAllEntries(change.newValue as CapturedEntry[]);
+        setAllEntries((change.newValue as CapturedEntry[]).map(normalizeEntry));
       }
     };
     chrome.storage.onChanged.addListener(handler);
@@ -130,9 +152,16 @@ export function useCapture({ hostFilter, recording }: UseCaptureOptions): UseCap
       .catch(() => undefined);
   }, [recording]);
 
+  // devtools.ts already applies these filters as requests arrive, but re-apply
+  // them here so toggling a filter re-shapes entries captured under the old
+  // settings without forcing a reload.
   const filtered = useMemo(
-    () => allEntries.filter((e) => matchesHostFilter(e.url, hostFilter)),
-    [allEntries, hostFilter]
+    () =>
+      applyCaptureFilters(
+        allEntries.filter((e) => matchesHostFilter(e.url, hostFilter)),
+        filters
+      ),
+    [allEntries, hostFilter, filters]
   );
 
   const clear = useCallback(() => {
@@ -141,7 +170,7 @@ export function useCapture({ hostFilter, recording }: UseCaptureOptions): UseCap
   }, []);
 
   const importFromNetworkLog = useCallback(async (): Promise<ImportSummary> => {
-    if (!chrome.devtools?.network?.getHAR) return { total: 0, matched: 0 };
+    if (!chrome.devtools?.network?.getHAR) return { total: 0, matched: 0, filtered: 0 };
     const har = await new Promise<unknown>((resolve) => {
       chrome.devtools.network.getHAR((h) => resolve(h));
     });
@@ -153,8 +182,10 @@ export function useCapture({ hostFilter, recording }: UseCaptureOptions): UseCap
         : [];
     const entries = raw as HarEntryLike[];
     const matched = entries.filter((e) => matchesHostFilter(e.request?.url ?? '', hostFilter));
-    if (matched.length > 0) {
-      const built = matched.map(buildEntryFromHar);
+    // Backfilled requests go through the same exclusions and type toggles as
+    // live ones, so an import can't sneak past the filters.
+    const built = matched.map(buildEntryFromHar).filter((e) => shouldCapture(e, filters));
+    if (built.length > 0) {
       const current = (await chrome.storage.session.get(STORAGE_KEYS.CAPTURE_BUFFER))[
         STORAGE_KEYS.CAPTURE_BUFFER
       ];
@@ -162,8 +193,8 @@ export function useCapture({ hostFilter, recording }: UseCaptureOptions): UseCap
       const next = [...existing, ...built];
       await chrome.storage.session.set({ [STORAGE_KEYS.CAPTURE_BUFFER]: next });
     }
-    return { total: entries.length, matched: matched.length };
-  }, [hostFilter]);
+    return { total: entries.length, matched: matched.length, filtered: built.length };
+  }, [hostFilter, filters]);
 
   const reloadInspectedPage = useCallback(() => {
     sharedReloadInspectedPage();
@@ -171,6 +202,7 @@ export function useCapture({ hostFilter, recording }: UseCaptureOptions): UseCap
 
   return {
     entries: filtered,
+    totalCaptured: allEntries.length,
     clear,
     importFromNetworkLog,
     reloadInspectedPage,

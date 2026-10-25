@@ -69,6 +69,8 @@ Fifteen mutation types (`upsertGroup`, `deleteGroup`, `toggleGroup`, `reorderGro
 
 Typed message protocol for Chrome runtime messaging. Twelve message types: `GET_STATE`, `MUTATE_STATE`, `RULES_UPDATED`, `MOCK_HIT`, `GET_HIT_LOG`, `CLEAR_HIT_LOG`, `GET_DNR_DEBUG`, `TEST_DNR_MATCH`, `CLEAR_DNR_MATCH_LOG`, `COOKIES_GET`, `COOKIES_SET`, `COOKIES_REMOVE`. Defined in `src/shared/messages.ts`.
 
+Content scripts may only send `GET_STATE` (answered with the trimmed `contentScriptState()` view) and `MOCK_HIT` (rebuilt by `sanitizeMockHit()`, since the page can forge hits). Every other message, and the Hit Log / DNR match-log ports, is restricted to extension pages by `isPrivilegedSender()` in `src/background/senders.ts`.
+
 ### Rule Matcher
 
 `specMatches()`, `isRuleActive()`, and `findFirstMockMatch()` in `src/shared/matcher.ts`. Used by both the page-world script (client-side interception) and the DNR translator (network-layer rules). First-match-wins ordering.
@@ -90,7 +92,7 @@ Typed message protocol for Chrome runtime messaging. Twelve message types: `GET_
 | `src/injected/`            | MAIN-world page injection — fetch/XHR patching                                                                              |
 | `src/devtools/`            | DevTools panel React app — rule editing, hit log, capture                                                                   |
 | `src/devtools/components/` | UI components — RuleEditor, RulesTable, GroupsTable, Storage/Cookies tabs & editors, HitLog, DnrDebug, Settings, JSON views |
-| `src/devtools/capture/`    | Network capture tab — recording, HAR import, promote-to-rule                                                                |
+| `src/devtools/capture/`    | Network capture tab — recording, filtering, HAR import, export, promote-to-rule                                             |
 | `src/popup/`               | Browser-action popup — master toggle, domain-grouped rule counts                                                            |
 | `src/shared/`              | Cross-context types, messages, matcher, constants, preferences                                                              |
 | `src/utils/`               | Pure utilities — ID generation, string hashing                                                                              |

@@ -53,6 +53,41 @@ export function isRuntimeMessage(value: unknown): value is RuntimeMessage {
   );
 }
 
+// Hits are reported from the page world, which the host page fully controls.
+// Rebuild a clean MockHit from primitives only, so a forged payload can't
+// smuggle objects into the Hit Log (React would throw rendering them) or
+// bloat the buffer with huge strings.
+const MAX_HIT_STRING_LENGTH = 4096;
+
+export function sanitizeMockHit(value: unknown): MockHit | null {
+  if (typeof value !== 'object' || value === null) return null;
+  const v = value as Record<string, unknown>;
+  const { ruleId, ruleName, url, method, statusCode, delayMs, ts } = v;
+  if (
+    typeof ruleId !== 'string' ||
+    typeof ruleName !== 'string' ||
+    typeof url !== 'string' ||
+    typeof method !== 'string' ||
+    typeof statusCode !== 'number' ||
+    typeof delayMs !== 'number' ||
+    typeof ts !== 'number' ||
+    !Number.isFinite(statusCode) ||
+    !Number.isFinite(delayMs) ||
+    !Number.isFinite(ts)
+  ) {
+    return null;
+  }
+  return {
+    ruleId: ruleId.slice(0, MAX_HIT_STRING_LENGTH),
+    ruleName: ruleName.slice(0, MAX_HIT_STRING_LENGTH),
+    url: url.slice(0, MAX_HIT_STRING_LENGTH),
+    method: method.slice(0, MAX_HIT_STRING_LENGTH),
+    statusCode,
+    delayMs,
+    ts,
+  };
+}
+
 export async function sendMessage<T>(message: RuntimeMessage): Promise<T> {
   return new Promise<T>((resolve, reject) => {
     chrome.runtime.sendMessage(message, (response) => {
