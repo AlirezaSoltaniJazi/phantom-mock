@@ -38,11 +38,11 @@
   "devDependencies": {
     "@crxjs/vite-plugin": "^3.0.0",
     "@eslint/js": "^10.0.1",
-    "@types/chrome": "^0.3.6",
+    "@types/chrome": "^0.3.7",
     "@types/node": "^25.9.9",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.4",
-    "@typescript-eslint/eslint-plugin": "^8.72.0",
+    "@typescript-eslint/eslint-plugin": "^8.72.1",
     "@typescript-eslint/parser": "^8.72.0",
     "@vitejs/plugin-react": "^6.1.2",
     "@vitest/coverage-v8": "^5.0.5",
